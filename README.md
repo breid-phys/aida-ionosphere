@@ -62,6 +62,10 @@
 
 AIDA is a real-time ionosphere/plasmasphere data assimilation model. AIDA uses measurements from ground- and satellite-based Global Navigation Satellite (GNSS) receivers and ionosondes to produce an improved global ionospheric representation. This package contains the necessary software to read the output files produced by the AIDA system, and produce outputs of electron density, Total Electron Content (TEC), MUF3000, and various ionospheric profile parameters (NmF2, foF2, hmF2, etc.)
 
+The AIDA interpreter is a standalone package to read the AIDA output files. It requires output from the AIDA model from [https://spaceweather.bham.ac.uk/output/](https://spaceweather.bham.ac.uk/output/).
+
+To access AIDA model output and forecast products, it is necessary to create a free account at [https://spaceweather.bham.ac.uk/accounts/register/](https://spaceweather.bham.ac.uk/accounts/register/).
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -73,11 +77,7 @@ To get a local copy up and running follow these simple example steps.
 
 ### Prerequisites
 
-The AIDA interpreter is a stan
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+
 
 ### Installation
 
@@ -85,15 +85,11 @@ _Below is an example of how you can instruct your audience on installing and set
 
 1. Clone the repo
    ```sh
-   git clone https://github.com/your_username_/Project-Name.git
+   git clone https://gitlab.bham.ac.uk/elvidgsm-dasp/aida-ionosphere.git
    ```
-3. Install aida package
+2. Install aida package
    ```sh
    python -m pip install -e /path/to/aida
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -153,8 +149,7 @@ for i, d in enumerate(['NmF2', 'hmF2', 'TEC', 'MUF3000']):
     fig.colorbar(pcm, ax=axs[2, ix])
 
 ```
-
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+ <img src="tests/data/output.png" alt="Example Output" height="380">
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
@@ -178,7 +173,3 @@ Project Link: [GitLab](https://gitlab.bham.ac.uk/elvidgsm-dasp/aida-ionosphere)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[product-screenshot]: tests/data/output.png
