@@ -228,9 +228,7 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ValueError(
-                " state parameterization does not match input file"
-            )
+            raise ValueError(" state parameterization does not match input file")
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
@@ -317,9 +315,7 @@ class AIDAState(object):
 
                 if "Parameters/" + Char not in openFile:
                     if self._strict_config:
-                        raise ValueError(
-                            f" parameter {Char} missing from input file."
-                        )
+                        raise ValueError(f" parameter {Char} missing from input file.")
                     else:
                         logger.error(f" parameter {Char} missing from input file.")
 
@@ -439,6 +435,35 @@ class AIDAState(object):
                         tmp_data = charGroup.create_dataset(tAttr, data=tmp_data)
 
         return
+
+    ###########################################################################
+    def background(self):
+        """
+        returns the background of an AIDAState object
+
+        Returns
+        -------
+        Background:State
+
+        """
+
+        allCharsHaveBkg = True
+        Background = copy.deepcopy(self)
+        for Char in Background.CharNames:
+            P = getattr(Background, Char)
+            P.numParticles = 1
+            if P.ptype == "active":
+                P.ptype = "static"
+            if P.bkgparameters is not None and not np.all(np.isnan(P.bkgparameters)):
+                P.parameters = P.bkgparameters
+            else:
+                allCharsHaveBkg = False
+            setattr(Background, Char, P)
+
+        if not allCharsHaveBkg:
+            raise ValueError(" missing background parameters.")
+
+        return Background
 
     ###########################################################################
 

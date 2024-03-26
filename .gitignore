@@ -6,13 +6,6 @@ devel*
 *.asv
 # exclude zip files
 *.zip
-# exclude data directories to avoid killing the server
-tests/data/*/*
-tests/data/*
-# allow test data for assimilation test
-!tests/data/example/*
-# re-disable test outputs
-tests/data/example/example_output/*
 *.spyproject
 *.scrap
 *.vscode
