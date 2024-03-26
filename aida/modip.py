@@ -11,12 +11,7 @@ import os
 import h5py
 import numpy as np
 import scipy.interpolate as spInt
-
-from ..config import AIDAConfig
-from ..logger import AIDAlogger
-
-
-logger = AIDAlogger(__name__)
+from importlib import resources
 
 
 ###############################################################################
@@ -32,7 +27,8 @@ class Modip(object):
         """ """
         if InputFile is None:
             InputFile = (
-                AIDAConfig()["config"]["moduledata"]
+                resources.files("aida")
+                .joinpath("data")
                 .joinpath("data_hires.h5")
                 .expanduser()
             )
@@ -51,7 +47,12 @@ class Modip(object):
             latModip, lonModip, modip, kx=3, ky=3
         )
 
-    def interp(self, lat, lon):
+    def interp(self, lat: np.array, lon: np.array) -> np.array:
+        if not isinstance(lat, np.ndarray):
+            lat = np.array(lat, dtype=float)
+        if not isinstance(lon, np.ndarray):
+            lon = np.array(lon, dtype=float)
+
         if not lat.shape == lon.shape:
             raise Exception("lat and lon inputs must have the same shape")
 

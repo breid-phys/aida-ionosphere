@@ -15,13 +15,11 @@ import h5py
 import numpy as np
 import xarray
 
-from ..data import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
+from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
 from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics
-from ..logger import AIDAlogger
-from ..exceptions import ConfigurationMismatch
+from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
-
 
 logger = AIDAlogger(__name__)
 
@@ -230,7 +228,7 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ConfigurationMismatch(
+            raise ValueError(
                 " state parameterization does not match input file"
             )
         elif value.lower() == "nequick":
@@ -319,7 +317,7 @@ class AIDAState(object):
 
                 if "Parameters/" + Char not in openFile:
                     if self._strict_config:
-                        raise ConfigurationMismatch(
+                        raise ValueError(
                             f" parameter {Char} missing from input file."
                         )
                     else:
@@ -347,7 +345,7 @@ class AIDAState(object):
                         atr_1 = getattr(P, atr)
                         atr_2 = getattr(temp_p, atr)
                         if atr_1 != atr_2:
-                            raise ConfigurationMismatch(
+                            raise ValueError(
                                 f" parameter {Char} has mismatched {atr}: "
                                 f" expected {atr_1}, received {atr_2}"
                             )
@@ -370,7 +368,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def saveFile(self, outputFile):
+    def saveFile(self, outputFile, is_output: bool = False):
         """
 
         Saves state to HDF5 file
@@ -422,6 +420,10 @@ class AIDAState(object):
 
                     tmp_data = getattr(dP, tAttr)
                     if tmp_data is None:
+                        continue
+
+                    if is_output and tAttr not in dP._output:
+                        # only save necessary fields for output files
                         continue
 
                     if tAttr in dP._statesized + dP._bkgsized:

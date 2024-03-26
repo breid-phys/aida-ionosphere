@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..logger import AIDAlogger
+from .logger import AIDAlogger
 
 logger = AIDAlogger(__name__)
 
@@ -72,6 +72,7 @@ class Parameter(object):
 
     _statesized = ["parameters", "velocity", "bkgvelocity", "acceleration"]
     _bkgsized = ["bkgparameters", "temperature"]
+    _output = ["parameters", "bkgparameters"]
 
     def __init__(self, **kwargs):
         self.name = None
@@ -255,7 +256,7 @@ class Parameter(object):
         else:
             self._velocity = np.array(value, dtype=float, ndmin=2)
 
-    ###################################################### 
+    ######################################################
 
     @property
     def acceleration(self):
