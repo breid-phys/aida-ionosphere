@@ -99,6 +99,7 @@ _Below is an example of how you can instruct your audience on installing and set
 <!-- USAGE EXAMPLES -->
 ## Usage
 
+### Maps
 ```py
 import aida
 import numpy as np
