@@ -181,12 +181,17 @@ for i, lon in enumerate(glon):
 For irregular grids, the argument `grid=2D` can be used. This requires `glat` and `glon` to be the same size.
 
 ```py
+# create irregular grid
+glat = [[45.0, 65.0, 77.0], [30.0, 40.0, 50.0]]
+glon = [[0.0, 345.0, -160.0], [-60.0, 61.1, 62.2]]
+alt = np.linspace(90.0, 500.0, 150)
+
 Output = Model.calc(
     lat=glat, lon=glon, alt=alt, grid="2D", collapse_particles=True, as_dict=True
 )
 ```
 
-In this example, the output will be in `dict` format.
+In this example, the output is in `dict` format.
 
 ```py
 # create figure
