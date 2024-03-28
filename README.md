@@ -269,8 +269,6 @@ for i, d in enumerate(["NmF2", "hmF2", "TEC", "MUF3000", "foF2"]):
 
 For some performance-critical applications, it is desireable to calculate only the electron density without additional overhead. This can be achieved with the `AIDAState.calcNe()` method. Like `AIDAState.calc()`, it accepts `glat`, `glon`, `alt`, and `grid`, but outputs only the electron density `Ne` as a `numpy` array. `AIDAState.calcNe()` is often 2 to 5 times faster than calling `AIDAState.calc()` for grid points with 1e3 to 1e4 unique lat/lon pairs.
 
-**CAUTION: `AIDAState.calcNe()` produces output in units of 1e11 m-3, not in unites of m-3! You must multiply the output by 1e11 to get the true electron density.**
-
 Use of `AIDAState.calcNe()` is not recommended unless required, such as when calculating sample points for sTEC calculations. 
 
 ```py
@@ -326,7 +324,8 @@ Ne = Model.calcNe(lat=glat, lon=glon, alt=alt, grid="1D")
 d = np.sqrt((x - rX) ** 2 + (y - rY) ** 2 + (z - rZ) ** 2)
 
 # integrate along ray
-sTEC = np.trapz(Ne*1e11, d) # array([3.33699994e+17])
+sTEC = np.trapz(Ne, d)  # array([3.36102813e+17])
+
 ```
 
 _For more examples, please refer to the [Documentation](https://example.com)_
