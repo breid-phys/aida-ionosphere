@@ -612,19 +612,17 @@ class AIDAState(object):
             }
 
         for Char in Output:
-            if Char not in (self.AIDACharNames + self.NeQuickCharNames):
-                # not an AIDA parameter
-                continue
-            elif Char in ["sNmF1", "sNmE"]:
+            
+            if Char in ["sNmF1", "sNmE"]:
                 continue
             elif "Nmp" in Char:
-                Output[Char] = 1.0e11 * Output[Char]
+                Output[Char] = 1e11 * Output[Char]
                 CharAttributes = {
                     "units": "m-3",
                     "description": f"peak density of the {Char[2:]} layer",
                 }
             elif "Nm" in Char:
-                Output[Char] = 1.0e11 * Output[Char]
+                Output[Char] = Output[Char]
                 CharAttributes = {
                     "units": "m-3",
                     "description": f"peak density of the {Char[2:]} layer",
@@ -848,8 +846,7 @@ class AIDAState(object):
                 tglon = np.atleast_3d(glon.ravel())
 
             Output["Ne"] = np.reshape(
-                1.0e11
-                * self._calcNe(
+                self._calcNe(
                     glat=tglat,
                     glon=tglon,
                     alt=talt,
@@ -874,7 +871,7 @@ class AIDAState(object):
             # tecAlt = xarray.DataArray(tecAlt, coords={"alt": tecAlt})
             M = self._calcNe(glat=tglat, glon=tglon, alt=tecAlt, **tOutput)
             Output["TEC"] = np.reshape(
-                1e11 * np.trapz(M, x=tecAlt) * 1e3 / 1e16, Size["2DShape"]
+                np.trapz(M, x=tecAlt) * 1e3 / 1e16, Size["2DShape"]
             )
 
         for Char in self.CharNames:
@@ -894,12 +891,14 @@ class AIDAState(object):
         Output["NmF1"] = NmF1
         Output["NmE"] = NmE
 
-        Output["foE"] = np.sqrt(Output["NmE"] / 0.124)
+        Output["foE"] = np.sqrt(Output["NmE"] / 0.124e11)
 
-        Output["foF1"] = np.sqrt(Output["NmF1"] / 0.124)
+        Output["foF1"] = np.sqrt(Output["NmF1"] / 0.124e11)
 
+        # only NmF2 needs to be rescaled
+        Output["NmF2"] = 1e11 * Output["NmF2"]
         Output["NmF2"] = np.fmax(Output["NmF2"], 0.0)
-        Output["foF2"] = np.sqrt(Output["NmF2"] / 0.124)
+        Output["foF2"] = np.sqrt(Output["NmF2"] / 0.124e11)
 
         if MUF3000:
             x = np.fmax(np.fmin(Output["foF2"] / Output["foE"], 1e6), 1.7)
@@ -1007,6 +1006,7 @@ class AIDAState(object):
             Ne = np.reshape(Ne, (Ne.shape[0], lon.shape[1], lon.shape[0], Ne.shape[2]))
 
         np.seterr(**oldsettings)
+        # rescale Ne
         return Ne
 
     def _calcNe(self, **kwargs):
@@ -1016,7 +1016,7 @@ class AIDAState(object):
         #    raise NotImplementedError("mixed xarray/numpy inputs not supported")
         if any(arg_is_xarray):
             if self.Parameterization == "NeQuick":
-                return xarray.apply_ufunc(
+                Ne = xarray.apply_ufunc(
                     Ne_NeQuick,
                     kwargs["glat"],
                     kwargs["glon"],
@@ -1040,7 +1040,7 @@ class AIDAState(object):
                 )
             elif self.Parameterization == "AIDA":
                 chi, _ = self.solzen(kwargs["glat"], kwargs["glon"])
-                return xarray.apply_ufunc(
+                Ne = xarray.apply_ufunc(
                     Ne_AIDA,
                     kwargs["glat"],
                     kwargs["glon"],
@@ -1067,11 +1067,13 @@ class AIDAState(object):
                 raise NotImplementedError("not implemented")
         else:
             if self.Parameterization == "NeQuick":
-                return self._calcNe_NeQuick(**kwargs)
+                Ne = self._calcNe_NeQuick(**kwargs)
             elif self.Parameterization == "AIDA":
-                return self._calcNe_AIDA(**kwargs)
+                Ne = self._calcNe_AIDA(**kwargs)
             else:
                 raise NotImplementedError("not implemented")
+
+        return 1e11 * Ne
 
     ###########################################################################
 

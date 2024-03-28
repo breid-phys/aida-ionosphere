@@ -584,7 +584,7 @@ def Ne_AIDA(
     # sNmF1 = np.where(chi < 90.0, sNmF1, 0.0)
     scut = expit(90.0 - chi)
     sNmF1 = sNmF1 * scut
-    sNmE = sNmE * scut
+    
     return Ne_NeQuick(
         glat,
         glon,
@@ -638,6 +638,8 @@ try:
         sNmE[0] = max(NmE - AF2_E - sNmF1[0] * AF1_E, 0.0)
         sNmF1[0] = max(NmF1 - AF2_F1 - sNmE[0] * AE_F1, 0.0)
         sNmE[0] = max(NmE - AF2_E - sNmF1[0] * AF1_E, 0.0)
+        sNmF1[0] = max(NmF1 - AF2_F1 - sNmE[0] * AE_F1, 0.0)
+        sNmE[0] = max(NmE - AF2_E - sNmF1[0] * AF1_E, 0.0)
 
 except Exception:
     print(traceback.format_exc())
@@ -650,6 +652,8 @@ except Exception:
         AE_F1 = sech2(0.5 * (hmE - hmF1) / Betop)
 
         sNmF1 = np.fmax(NmF1 - AF2_F1, 0.0)
+        sNmE = np.fmax(NmE - AF2_E - sNmF1 * AF1_E, 0.0)
+        sNmF1 = np.fmax(NmF1 - AF2_F1 - sNmE * AE_F1, 0.0)
         sNmE = np.fmax(NmE - AF2_E - sNmF1 * AF1_E, 0.0)
         sNmF1 = np.fmax(NmF1 - AF2_F1 - sNmE * AE_F1, 0.0)
         sNmE = np.fmax(NmE - AF2_E - sNmF1 * AF1_E, 0.0)

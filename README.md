@@ -234,34 +234,32 @@ BkgOutput = BkgModel.calc(
 ```
 
 ```py
-fig, axs = plt.subplots(3, 4, squeeze=False)
+fig, axs = plt.subplots(3, 5, squeeze=False)
 fig.set_size_inches(15, 10)
 
-for i, d in enumerate(['NmF2', 'hmF2', 'TEC', 'MUF3000']):
-    
-    ax = axs[0,i]
+for i, d in enumerate(["NmF2", "hmF2", "TEC", "MUF3000", "foF2"]):
+
+    ax = axs[0, i]
     pcm = ax.pcolor(Output.glon, Output.glat, Output[d].T)
     ax.set_title(f"AIDA {d}")
-    fig.colorbar(pcm, ax=ax, label=Output[d].attrs['units'])
-    pcm.set_cmap(colormaps['magma'])
+    fig.colorbar(pcm, ax=ax, label=Output[d].attrs["units"])
+    pcm.set_cmap(colormaps["magma"])
     cl = pcm.get_clim()
 
     ax = axs[1, i]
     pcm = ax.pcolor(BkgOutput.glon, BkgOutput.glat, BkgOutput[d].T)
     ax.set_title(f"Background {d}")
-    fig.colorbar(pcm, ax=ax, label=Output[d].attrs['units'])
-    pcm.set_cmap(colormaps['magma'])
+    fig.colorbar(pcm, ax=ax, label=Output[d].attrs["units"])
+    pcm.set_cmap(colormaps["magma"])
     pcm.set_clim(cl)
 
     ax = axs[2, i]
-    pcm = ax.pcolor(
-        BkgOutput.glon, BkgOutput.glat, (Output[d] - BkgOutput[d]).T
-    )
+    pcm = ax.pcolor(BkgOutput.glon, BkgOutput.glat, (Output[d] - BkgOutput[d]).T)
     ax.set_title(f"Difference {d}")
-    fig.colorbar(pcm, ax=ax, label=Output[d].attrs['units'])
+    fig.colorbar(pcm, ax=ax, label=Output[d].attrs["units"])
     cl = np.max(np.abs(pcm.get_clim()))
     pcm.set_clim(-cl, cl)
-    pcm.set_cmap(colormaps['bwr'])
+    pcm.set_cmap(colormaps["bwr"])
 
 ```
 
