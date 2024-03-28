@@ -1,0 +1,26 @@
+# exclude trial files
+scrap*
+devel*
+# exclude temporary files MATLAB creates
+*.m~
+*.asv
+# exclude zip files
+*.zip
+*.spyproject
+*.scrap
+*.vscode
+.vscode/
+*.pytest_cache
+*__pycache*
+*egg-info*
+*.lock
+profile_output*
+# Python
+*.pyc
+env/
+dist/
+docs/_*
+
+
+
+
