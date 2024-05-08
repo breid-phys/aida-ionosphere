@@ -342,7 +342,7 @@ class AIDAState(object):
                         atr_1 = getattr(P, atr)
                         atr_2 = getattr(temp_p, atr)
                         if atr_1 != atr_2:
-                            raise ValueError(
+                            raise ConfigurationMismatch(
                                 f" parameter {Char} has mismatched {atr}: "
                                 f" expected {atr_1}, received {atr_2}"
                             )
