@@ -16,10 +16,11 @@ import numpy as np
 import xarray
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics
+from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics, _Nm2sNm
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
+from .exceptions import ConfigurationMismatch
 
 logger = AIDAlogger(__name__)
 
@@ -228,7 +229,7 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ValueError(" state parameterization does not match input file")
+            raise ConfigurationMismatch(" state parameterization does not match input file")
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
@@ -612,7 +613,7 @@ class AIDAState(object):
             }
 
         for Char in Output:
-            
+
             if Char in ["sNmF1", "sNmE"]:
                 continue
             elif "Nmp" in Char:
@@ -821,19 +822,9 @@ class AIDAState(object):
             glat.ravel(), glon.ravel(), particleIndex=particleIndex
         ):
             Output[Char] = Data
-            # Param = getattr(self, Char)
-            # Output[Char] = np.reshape(Data, Size["2DShape"])
-            # if Param.ptype == "active":
-            #    Output[Char] = np.reshape(Data, Size["2DShape"])
-            # else:
-            #    Output[Char] = np.reshape(Data, Size["2DShape"][1:])
 
         if not np.all(np.isnan(alt)):
-            # baseShape = np.ones(len(Size["3DShape"]), dtype=int)
-            # altShape = baseShape + 0
-            # altShape[Size["3D"] == "alt"] = alt.size
-            # crdShape = baseShape + 0
-            # crdShape[np.isin(Size["3D"],)]
+
             if grid == "1D":
                 talt = np.reshape(alt, (1, alt.size))
                 tOutput = {Char: np.atleast_2d(Output[Char]) for Char in self.CharNames}
@@ -888,8 +879,24 @@ class AIDAState(object):
         chi, cchi = self.solzen(glat, glon)
         NmF1 = np.where(chi < 90.0, NmF1, np.nan)
 
-        Output["NmF1"] = NmF1
-        Output["NmE"] = NmE
+        if self.Parameterization == "NeQuick":
+            sNmF1 = Output["sNmF1"]
+            sNmE = Output["sNmE"]
+        elif self.Parameterization == "AIDA":
+            sNmF1, sNmE = _Nm2sNm(
+                Output["NmF2"],
+                Output["hmF2"],
+                Output["B2bot"],
+                Output["NmF1"],
+                Output["hmF1"],
+                Output["B1bot"],
+                Output["NmE"],
+                Output["hmE"],
+                Output["Betop"],
+            )
+
+        Output["NmF1"] = np.where(sNmF1 > 0.0, NmF1, np.nan)
+        Output["NmE"] = np.where(sNmE > 0.0, NmE, np.nan)
 
         Output["foE"] = np.sqrt(Output["NmE"] / 0.124e11)
 

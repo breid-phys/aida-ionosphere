@@ -72,16 +72,13 @@ To access AIDA model output and forecast products, it is necessary to create a f
 <!-- GETTING STARTED -->
 ## Getting Started
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
-
 ### Prerequisites
 
 
 
-### Installation
+### Installation (Local Computer)
 
-_Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
+_Currently the AIDA interpreter must be installed using git. In the future the model interpreter will be made available on PyPI._
 
 1. Clone the repo
    ```sh
@@ -92,9 +89,31 @@ _Below is an example of how you can instruct your audience on installing and set
    python -m pip install -e /path/to/aida
    ```
 
+### Installation (BlueBEAR)
+
+_The AIDA interpreter is already available on BlueBEAR through the `dasp` project virtual environment._
+
+```sh
+$ module purge; module load bluebear
+$ module load Python/3.9.5-GCCcore-10.3.0-bare
+$ source /rds/projects/e/elvidgsm-dasp/DASP-website/code/venv/bin/activate 
+```
+
+_You can check if the package is available using the command `pip freeze`, which will print all currently installed python packages._
+
+```sh
+$ pip freeze | grep aida
+  ionodasp @ file:///rds/projects/e/elvidgsm-dasp/DASP-website/code/ dasp_assimilation
+```
+
+
+
+### Finding AIDA Output Files on BlueBEAR
+
+Output from the online AIDA models can be found at `/rds/projects/e/elvidgsm-dasp/DASP-website/AIDA_output/archive/{model}/{yyyy}/{doy}/`.
+
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- USAGE EXAMPLES -->
 ## Usage
