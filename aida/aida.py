@@ -117,6 +117,26 @@ class AIDAState(object):
         "Hpt",
     ]
 
+    # AIDA Char names
+    AIDACharNames = [
+        "NmF2",
+        "hmF2",
+        "B2top",
+        "B2bot",
+        "NmF1",
+        "hmF1",
+        "B1top",
+        "B1bot",
+        "NmE",
+        "hmE",
+        "Bebot",
+        "Betop",
+        "Nmpl",
+        "Hpl",
+        "Nmpt",
+        "Hpt",
+    ]
+
     npsmNames = ["Nmpl", "Hpl", "Nmpt", "Hpt"]
 
     fluxNames = [
