@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aida"
-version = "0.0"
+version = "0.1"
 description = "AIDA ionospheric data assimilation"
 authors = ["Benjamin Reid <b.reid@bham.ac.uk>"]
 readme = "README.md"

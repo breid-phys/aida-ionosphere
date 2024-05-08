@@ -20,6 +20,7 @@ from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics, _Nm2sNm
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
+from .exceptions import ConfigurationMismatch
 
 logger = AIDAlogger(__name__)
 
@@ -228,7 +229,7 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ValueError(" state parameterization does not match input file")
+            raise ConfigurationMismatch(" state parameterization does not match input file")
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
