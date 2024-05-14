@@ -470,7 +470,3 @@ def _Nm2sNm(NmF2, hmF2, B2bot, NmF1, hmF1, B1bot, NmE, hmE, Betop, sNmF1, sNmE):
     for i in range(4):
         sNmE[0] = max(NmE - AF2_E - sNmF1[0] * AF1_E, 0.0)
         sNmF1[0] = max(NmF1 - AF2_F1 - sNmE[0] * AE_F1, 0.0)
-
-
-###############################################################################
-
