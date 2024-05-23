@@ -11,6 +11,7 @@ import math
 from numba import float64, guvectorize, vectorize, njit
 import numpy as np
 from scipy.special import expit
+from .iri import _Ne_iri
 
 REm = 6371211.266  # Earth's mean radius in meter
 REkm = REm / 1000  # km
@@ -470,3 +471,58 @@ def _Nm2sNm(NmF2, hmF2, B2bot, NmF1, hmF1, B1bot, NmE, hmE, Betop, sNmF1, sNmE):
     for i in range(4):
         sNmE[0] = max(NmE - AF2_E - sNmF1[0] * AF1_E, 0.0)
         sNmF1[0] = max(NmF1 - AF2_F1 - sNmE[0] * AE_F1, 0.0)
+
+
+###############################################################################
+
+@vectorize(
+    nopython=True,
+    target=target,
+    fastmath=True,
+)
+def Ne_iri(
+    glat,
+    glon,
+    alt,
+    NmF2,
+    hmF2,
+    B2top,
+    B0,
+    B1,
+    PF1,
+    NmF1,
+    NmE,
+    hmE,
+    modip,
+    doy,
+    hour,
+    NmD,
+    Nmpt,
+    Hpt,
+    Nmpl,
+    Hpl,
+):
+
+    if alt > hmF2:
+        # topside
+
+        return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
+    else:
+
+        return _Ne_iri(
+            glat,
+            glon,
+            alt,
+            NmF2,
+            hmF2,
+            B0,
+            B1,
+            PF1,
+            NmF1,
+            NmE,
+            hmE,
+            modip,
+            doy,
+            hour,
+            NmD,
+        )
