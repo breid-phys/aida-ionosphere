@@ -11,7 +11,7 @@ import math
 from numba import float64, guvectorize, vectorize, njit
 import numpy as np
 from scipy.special import expit
-from .iri import _Ne_iri
+from .iri import _Ne_iri, _Ne_iri_stec
 
 REm = 6371211.266  # Earth's mean radius in meter
 REkm = REm / 1000  # km
@@ -475,6 +475,7 @@ def _Nm2sNm(NmF2, hmF2, B2bot, NmF1, hmF1, B1bot, NmE, hmE, Betop, sNmF1, sNmE):
 
 ###############################################################################
 
+
 @vectorize(
     nopython=True,
     target=target,
@@ -510,6 +511,62 @@ def Ne_iri(
     else:
 
         return _Ne_iri(
+            glat,
+            glon,
+            alt,
+            NmF2,
+            hmF2,
+            B0,
+            B1,
+            PF1,
+            NmF1,
+            NmE,
+            hmE,
+            modip,
+            doy,
+            hour,
+            NmD,
+        )
+
+
+###############################################################################
+
+
+@vectorize(
+    nopython=True,
+    target=target,
+    fastmath=True,
+)
+def Ne_iri_stec(
+    glat,
+    glon,
+    alt,
+    NmF2,
+    hmF2,
+    B2top,
+    B0,
+    B1,
+    PF1,
+    NmF1,
+    NmE,
+    hmE,
+    modip,
+    doy,
+    hour,
+    NmD,
+    Nmpt,
+    Hpt,
+    Nmpl,
+    Hpl,
+):
+
+    if alt > hmF2:
+        # topside
+
+        return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
+    else:
+
+        return _Ne_iri_stec(
             glat,
             glon,
             alt,

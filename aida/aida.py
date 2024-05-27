@@ -117,20 +117,18 @@ class AIDAState(object):
         "Hpt",
     ]
 
-    # AIDA Char names
-    AIDACharNames = [
+    # IRI Char names
+    IRICharNames = [
         "NmF2",
         "hmF2",
         "B2top",
-        "B2bot",
+        "B0",
+        "B1",
         "NmF1",
         "hmF1",
-        "B1top",
-        "B1bot",
+        "PF1",
         "NmE",
         "hmE",
-        "Bebot",
-        "Betop",
         "Nmpl",
         "Hpl",
         "Nmpt",
@@ -249,12 +247,17 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ConfigurationMismatch(" state parameterization does not match input file")
+            raise ConfigurationMismatch(
+                " state parameterization does not match input file"
+            )
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
         elif value.lower() == "aida":
             self._Parameterization = "AIDA"
+            self.CharNames = AIDAState.AIDACharNames
+        elif value.lower() == "iri":
+            self._Parameterization = "IRI"
             self.CharNames = AIDAState.AIDACharNames
         else:
             raise ValueError(f"Invalid parameterization {value}")
@@ -659,7 +662,7 @@ class AIDAState(object):
                     "units": "km",
                     "description": f"altitude of the {Char[2:]} layer peak density",
                 }
-            elif "B" == Char[0]:
+            elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
                 if Char[1] == "e":
@@ -914,6 +917,10 @@ class AIDAState(object):
                 Output["hmE"],
                 Output["Betop"],
             )
+        elif self.Parameterization == "IRI":
+            # only used for NmF1 masking
+            sNmF1 = Output["NmF1"]
+            sNmE = Output["NmE"]
 
         Output["NmF1"] = np.where(sNmF1 > 0.0, NmF1, np.nan)
         Output["NmE"] = np.where(sNmE > 0.0, NmE, np.nan)

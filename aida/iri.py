@@ -101,6 +101,33 @@ def _h_star(hmF1, C1, h):
 
 
 ###############################################################################
+@njit(nogil=True, fastmath=True, error_model="numpy")
+def _raw_asech(x):
+    # pure python version
+    ix = 1.0 / x
+    return math.log(ix + math.sqrt(ix * ix - 1.0))
+
+
+@njit(
+    "float64(float64, float64)",
+    nogil=True,
+    fastmath=True,
+    error_model="numpy",
+)
+def _newton_guess(A, B1):
+    lB = math.log(B1)
+    lA = math.log(A)
+
+    XB1 = -0.920140793640201 + 0.384069525658598 * lB
+    XB2 = -0.227098194315023 + 0.385002900867688 * lB
+    XB3 = -0.049711817247645 + 0.080686056815511 * lB
+
+    x = (XB1 * lA + XB2 * lA**2 + XB3 * lA**3) ** (1.0 / B1)
+    x = min(x, _raw_asech(A))
+    return x
+
+
+###############################################################################
 @njit(
     "float64(float64, float64)",
     nogil=True,
@@ -114,8 +141,7 @@ def _newton(A, B1):
     tol = 0.01
 
     # first guess
-    x = (-math.log(A)) ** (1.0 / B1)
-    x = (-math.log(2.0 * A - _xe2(x, B1))) ** (1.0 / B1)
+    x = _newton_guess(A, B1)
 
     f = _xe2(x, B1) - A
     df = _dxe2(x, B1)
@@ -200,10 +226,7 @@ def _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE):
 
     h = hmF1 - hmF1 * (1.0 - hs3 / hmF1) ** (1.0 / (1.0 + C1))
 
-    if h >= 100.0:
-        return h
-    else:
-        return 0.0
+    return h
 
 
 @njit(
@@ -219,8 +242,8 @@ def _newton_hst(NmF2, hmF2, B0, B1, NmE):
     """
 
     A = NmE / NmF2
-
-    return hmF2 - _newton(A, B1) * B0
+    h = hmF2 - _newton(A, B1) * B0
+    return h
 
 
 @njit(
@@ -585,8 +608,6 @@ def _Ne_iri(
         else:
             hmF1 = 0.0
 
-        hl_max = hmE + 67.0
-
         # only calculate sun parameters once
         calc_sun = False
 
@@ -596,41 +617,8 @@ def _Ne_iri(
 
             C1 = _C1(modip, hour, sax110, sux110)
             hst = _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE)
-
-            hF1 = hmF1
-
-            if hst > 0.0:
-                HZ_max = 0.5 * (hst + hF1)
-            else:
-                # edge case, hst == 0.0
-                HZ_max = 0.5 * (hl_max + hF1)
-
-            if alt > HZ_max:
-                # Guaranteed above HZ
-                # Skip calculating lower layers
-                x = (hmF2 - _h_star(hmF1, C1, alt)) / B0
-                return NmF2 * _xe2(x, B1)
-
         else:
             hst = _newton_hst(NmF2, hmF2, B0, B1, NmE)
-            # temporary value
-            hF1_max = 0.5 * (hmF2 + hl_max)
-
-            if hst > hF1_max:
-                # fix for high latitudes
-                hF1_max = hmF2
-
-            if hst > 0.0:
-                HZ_max = 0.5 * (hst + hF1_max)
-            else:
-                # edge case, hst == 0.0
-                HZ_max = 0.5 * (hl_max + hF1_max)
-
-            if alt > HZ_max:
-                # Guaranteed above HZ
-                # Skip calculating lower layers
-                x = (hmF2 - alt) / B0
-                return NmF2 * _xe2(x, B1)
 
         # below the maximum possible value of HZ
         # This part of the profile is complicated
@@ -655,13 +643,10 @@ def _Ne_iri(
 
         if hst > hF1:
             # fix for high latitudes
-            hF1 = hmF2
+            hF1 = min(hst + 0.25 * B0, hmF2)
 
-        if hst > 0.0:
-            HZ = 0.5 * (hst + hF1)
-        else:
-            # edge case, hst == 0.0
-            HZ = 0.5 * (hl + hF1)
+        # NEWT
+        HZ = 0.5 * (max(hst, hl) + hF1)
 
         if alt > hmF1 and alt > HZ:
             # Bottomside
@@ -672,85 +657,34 @@ def _Ne_iri(
             x = (hmF2 - _h_star(hmF1, C1, alt)) / B0
             return NmF2 * _xe2(x, B1)
 
-        # check for valley modification case
-        if hst > 0.0 and hst < hl:
-            T = ((HZ - hst) ** 2) / (hst - hl)
-
-            nhl = HZ + 0.5 * T + math.sqrt(T * (0.25 * T - (hl - HZ)))
-            if hmF1 > 0.0:
-                # F1 layer present
-                xl = (hmF2 - _h_star(hmF1, C1, nhl)) / B0
-            else:
-                xl = (hmF2 - nhl) / B0
-
-            while ((NmF2 * _xe2(xl, B1) - NmE) / NmE) > 0.01:
-                # adjust valley
-                if hl <= hmE or hl <= hst:
-                    break
-                hl = hl - 1.0
-
-                # update intermediate heights
-                hvt = hl
-                if hmF1 > 0.0:
-                    hF1 = hmF1
-                else:
-                    hF1 = 0.5 * (hmF2 + hl)
-                if hst > 0.0:
-                    HZ = 0.5 * (hst + hF1)
-                else:
-                    # edge case, hst == 0.0
-                    HZ = 0.5 * (hl + hF1)
-
-                T = ((HZ - hst) ** 2) / (hst - hl)
-
-                nhl = HZ + 0.5 * T + math.sqrt(T * (0.25 * T - (hl - HZ)))
-                if hmF1 > 0.0:
-                    # F1 layer present
-                    xl = (hmF2 - _h_star(hmF1, C1, nhl)) / B0
-                else:
-                    xl = (hmF2 - nhl) / B0
-
-            X1, X2, X3, X4, WIDTH = _E_valley(
-                modip, hour, sax110, sux110, hvt - hmE, seasn
-            )
-
-            if X1 == 0.0 and X2 == 0.0 and X3 == 0.0 and X4 == 0.0:
-                # valley failed
-                hvt = hmE
-                hl = hmE
-
         if alt >= hl:
             # intermediate layer
-            if hst > 0.0:
 
-                T = ((HZ - hst) ** 2) / (hst - hl)
+            T = ((HZ - hst) ** 2) / (hst - hl)
 
-                if hst > hl:
+            if T < 0:
 
-                    nh = HZ + 0.5 * T - math.sqrt(T * (0.25 * T - (alt - HZ)))
-                elif hst < hl:
+                a = (hl - hst) / (2 * HZ * hl - HZ * HZ - hl * hl)
+                b = 1 - 2 * a * HZ
+                c = HZ - a * HZ**2 - b * HZ
+                nh = a * (alt**2) + b * (alt) + c
 
-                    nh = HZ + 0.5 * T + math.sqrt(T * (0.25 * T - (alt - HZ)))
-                else:
-                    nh = alt
+            elif hst > hl:
 
-                if hmF1 > 0.0:
-                    # F1 layer present
-                    x = (hmF2 - _h_star(hmF1, C1, nh)) / B0
-                else:
-                    x = (hmF2 - nh) / B0
-
-                return NmF2 * _xe2(x, B1)
+                nh = HZ + 0.5 * T - math.sqrt(T * (0.25 * T - (alt - HZ)))
+            elif hst < hl:
+                # should not happen
+                nh = HZ + 0.5 * T + math.sqrt(T * (0.25 * T - (alt - HZ)))
             else:
-                # edge case, hst == 0.0
-                if hmF1 > 0.0:
-                    XNEHZ = NmF2 * _xe2((hmF2 - _h_star(hmF1, C1, HZ)) / B0, B1)
-                else:
-                    XNEHZ = NmF2 * _xe2((hmF2 - HZ) / B0, B1)
+                nh = alt
 
-                T = (XNEHZ - NmE) / (HZ - hl)
+            if hmF1 > 0.0:
+                # F1 layer present
+                x = (hmF2 - _h_star(hmF1, C1, nh)) / B0
+            else:
+                x = (hmF2 - nh) / B0
 
-                return NmE + T * (alt - hl)
+            return NmF2 * _xe2(x, B1)
 
         elif alt > hmE and alt < hvt:
             # E valley
@@ -783,3 +717,77 @@ def _Ne_iri(
             else:
                 FP3 = FP3U
             return NmD * math.exp(z * (FP1 + z * (FP2 + z * FP3)))
+
+
+###############################################################################
+
+
+@njit(
+    nogil=True,
+    fastmath=True,
+    error_model="numpy",
+)
+def _Ne_iri_stec(
+    glat, glon, alt, NmF2, hmF2, B0, B1, PF1, NmF1, NmE, hmE, modip, doy, hour, NmD
+):
+
+    if alt > hmE:
+        # bottomside
+
+        if PF1 > 0.5 and 0.9 * NmF1 >= NmE:
+            # F1 layer present
+            A = NmF1 / NmF2
+
+            hmF1 = hmF2 - _newton_guess(A, B1) * B0
+
+            if alt > hmF1 and hmF1 > hmE:
+                # between hmF2 and hmF1
+                x = (hmF2 - alt) / B0
+                return max(NmE, NmF2 * _xe2(x, B1))
+
+        else:
+            hmF1 = 0.0
+
+        if hmF1 > 0.0:
+            decl, zenith, sax110, sux110 = _soco(doy, hour, glat, glon, 110.0)
+
+            C1 = _C1(modip, hour, sax110, sux110)
+
+            A = NmE / NmF2
+
+            hs3 = hmF2 - _newton_guess(A, B1) * B0
+
+            hst = hmF1 - hmF1 * (1.0 - hs3 / hmF1) ** (1.0 / (1.0 + C1))
+
+            HZ = 0.5 * (max(hst, hmE) + hmF1)
+
+            if alt > HZ:
+
+                x = (hmF2 - _h_star(hmF1, C1, alt)) / B0
+
+                return max(NmE, NmF2 * _xe2(x, B1))
+
+            else:
+                XNEHZ = NmF2 * _xe2((hmF2 - _h_star(hmF1, C1, HZ)) / B0, B1)
+
+                T = (XNEHZ - NmE) / (HZ - hmE)
+
+                return max(NmE, NmE + T * (alt - hmE))
+
+        else:
+
+            A = NmE / NmF2
+
+            hst = hmF2 - _newton_guess(A, B1) * B0
+
+            HZ = 0.5 * (max(hst, hmE) + 0.5 * (hmF2 + hmE))
+
+            if alt > HZ:
+                x = (hmF2 - alt) / B0
+                return max(NmE, NmF2 * _xe2(x, B1))
+            else:
+                XNEHZ = NmF2 * _xe2((hmF2 - HZ) / B0, B1)
+                T = (XNEHZ - NmE) / (HZ - hmE)
+                return max(NmE, NmE + T * (alt - hmE))
+    else:
+        return NmE * _eps_0(alt, 1.0, 0.5 * (hmE + 85.0))
