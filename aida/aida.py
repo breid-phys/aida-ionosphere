@@ -16,7 +16,8 @@ import numpy as np
 import xarray
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics, _Nm2sNm
+from .ne import Ne_AIDA, Ne_NeQuick, Ne_iri, sph_harmonics, _Nm2sNm
+from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
@@ -125,10 +126,10 @@ class AIDAState(object):
         "B0",
         "B1",
         "NmF1",
-        "hmF1",
         "PF1",
         "NmE",
         "hmE",
+        "NmD",
         "Nmpl",
         "Hpl",
         "Nmpt",
@@ -137,10 +138,10 @@ class AIDAState(object):
 
     npsmNames = ["Nmpl", "Hpl", "Nmpt", "Hpt"]
 
-    fluxNames = [
-        "NeQuickFluxfoF2",
-        "NeQuickFluxMUF3000",
-        "NeQuickFluxEF1",
+    IRIfluxNames = ["NPSMFlux", "F107", "F107_81", "F107_365", "IG12", "Rz12"]
+
+    NeQuickfluxNames = [
+        "NeQuickFlux",
         "NPSMFlux",
     ]
 
@@ -226,9 +227,14 @@ class AIDAState(object):
 
         return
 
-    def __str__(self):
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def __repr__(self) -> str:
         out = ""
         for attr in self.__dict__:
+            if attr[0] == "_":
+                continue
             out += f"{attr}: {getattr(self, attr)}\n"
         return out
 
@@ -253,12 +259,15 @@ class AIDAState(object):
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
+            self.fluxNames = AIDAState.NeQuickfluxNames
         elif value.lower() == "aida":
             self._Parameterization = "AIDA"
             self.CharNames = AIDAState.AIDACharNames
+            self.fluxNames = AIDAState.NeQuickfluxNames
         elif value.lower() == "iri":
             self._Parameterization = "IRI"
-            self.CharNames = AIDAState.AIDACharNames
+            self.CharNames = AIDAState.IRICharNames
+            self.fluxNames = AIDAState.IRIfluxNames
         else:
             raise ValueError(f"Invalid parameterization {value}")
 
@@ -895,18 +904,31 @@ class AIDAState(object):
             else:
                 Output[Char] = np.reshape(Output[Char], Size["2DShape"][1:])
 
-        # calculated separately so that bottomside effects can occur (B2bot)
-        NmF1 = self._calcNe(glat=glat, glon=glon, alt=Output["hmF1"], **Output)
-        NmE = self._calcNe(glat=glat, glon=glon, alt=Output["hmE"], **Output)
+        if self.Parameterization == "IRI":
+            Output["hmF1"] = newton_hmF1(
+                Output["NmF2"],
+                Output["hmF2"],
+                Output["B0"],
+                Output["B1"],
+                Output["NmF1"],
+                Output["NmE"],
+                Output["hmE"],
+            )
+            NmF1 = Output["NmF1"] * 1e11
+            NmE = np.fmax(Output["NmE"] * 1e11, NmE_min())
+        else:
+            # calculated separately so that bottomside effects can occur (B2bot)
+            NmF1 = self._calcNe(glat=glat, glon=glon, alt=Output["hmF1"], **Output)
+            NmE = self._calcNe(glat=glat, glon=glon, alt=Output["hmE"], **Output)
 
         chi, cchi = self.solzen(glat, glon)
         NmF1 = np.where(chi < 90.0, NmF1, np.nan)
 
         if self.Parameterization == "NeQuick":
-            sNmF1 = Output["sNmF1"]
-            sNmE = Output["sNmE"]
+            mask_NmF1 = Output["sNmF1"]
+            mask_NmE = Output["sNmE"]
         elif self.Parameterization == "AIDA":
-            sNmF1, sNmE = _Nm2sNm(
+            mask_NmF1, mask_NmE = _Nm2sNm(
                 Output["NmF2"],
                 Output["hmF2"],
                 Output["B2bot"],
@@ -919,11 +941,11 @@ class AIDAState(object):
             )
         elif self.Parameterization == "IRI":
             # only used for NmF1 masking
-            sNmF1 = Output["NmF1"]
-            sNmE = Output["NmE"]
+            mask_NmF1 = Output["PF1"] - 0.5
+            mask_NmE = np.ones_like(Output["NmE"])
 
-        Output["NmF1"] = np.where(sNmF1 > 0.0, NmF1, np.nan)
-        Output["NmE"] = np.where(sNmE > 0.0, NmE, np.nan)
+        Output["NmF1"] = np.where(mask_NmF1 > 0.0, NmF1, np.nan)
+        Output["NmE"] = np.where(mask_NmE > 0.0, NmE, np.nan)
 
         Output["foE"] = np.sqrt(Output["NmE"] / 0.124e11)
 
@@ -933,6 +955,9 @@ class AIDAState(object):
         Output["NmF2"] = 1e11 * Output["NmF2"]
         Output["NmF2"] = np.fmax(Output["NmF2"], 0.0)
         Output["foF2"] = np.sqrt(Output["NmF2"] / 0.124e11)
+
+        if "NmD" in Output:
+            Output["NmD"] = 1e11 * Output["NmD"]
 
         if MUF3000:
             x = np.fmax(np.fmin(Output["foF2"] / Output["foE"], 1e6), 1.7)
@@ -1097,6 +1122,36 @@ class AIDAState(object):
                     kwargs["Hpl"],
                     chi,
                 )
+            elif self.Parameterization == "IRI":
+                hour, doy = self._iri_time(kwargs["glon"])
+                if "modip" not in kwargs:
+                    modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
+                else:
+                    modip = kwargs["modip"]
+
+                Ne = xarray.apply_ufunc(
+                    Ne_iri,
+                    kwargs["glat"],
+                    kwargs["glon"],
+                    kwargs["alt"],
+                    kwargs["NmF2"],
+                    kwargs["hmF2"],
+                    kwargs["B2top"],
+                    kwargs["B0"],
+                    kwargs["B1"],
+                    kwargs["PF1"],
+                    kwargs["NmF1"],
+                    kwargs["NmE"],
+                    kwargs["hmE"],
+                    modip,
+                    doy,
+                    hour,
+                    kwargs["NmD"],
+                    kwargs["Nmpt"],
+                    kwargs["Hpt"],
+                    kwargs["Nmpl"],
+                    kwargs["Hpl"],
+                )
             else:
                 raise NotImplementedError("not implemented")
         else:
@@ -1104,6 +1159,34 @@ class AIDAState(object):
                 Ne = self._calcNe_NeQuick(**kwargs)
             elif self.Parameterization == "AIDA":
                 Ne = self._calcNe_AIDA(**kwargs)
+            elif self.Parameterization == "IRI":
+                hour, doy = self._iri_time(kwargs["glon"])
+                if "modip" not in kwargs:
+                    modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
+                else:
+                    modip = kwargs["modip"]
+                Ne = Ne_iri(
+                    kwargs["glat"],
+                    kwargs["glon"],
+                    kwargs["alt"],
+                    kwargs["NmF2"],
+                    kwargs["hmF2"],
+                    kwargs["B2top"],
+                    kwargs["B0"],
+                    kwargs["B1"],
+                    kwargs["PF1"],
+                    kwargs["NmF1"],
+                    kwargs["NmE"],
+                    kwargs["hmE"],
+                    modip,
+                    doy,
+                    hour,
+                    kwargs["NmD"],
+                    kwargs["Nmpt"],
+                    kwargs["Hpt"],
+                    kwargs["Nmpl"],
+                    kwargs["Hpl"],
+                )
             else:
                 raise NotImplementedError("not implemented")
 
@@ -1160,11 +1243,6 @@ class AIDAState(object):
         return self._calcValueBasis(
             Basis, MBasis, charList=charList, particleIndex=particleIndex
         )
-
-        # for Value in self._calcValueBasis(
-        #    Basis, MBasis, charList=charList, particleIndex=particleIndex
-        # ):
-        #    yield Value
 
     ###########################################################################
 
@@ -1572,6 +1650,15 @@ class AIDAState(object):
         )
 
         return Config
+
+    def _iri_time(self, lon: float):
+        time = epoch2dt(self.Time)
+        hour = np.mod((lon / 15 + time.hour + time.minute / 60), 24.0)
+
+        doy = (
+            dt.datetime(time.year, time.month, time.day) - dt.datetime(time.year, 1, 1)
+        ).days + 1
+        return hour, doy
 
 
 ###############################################################################

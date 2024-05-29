@@ -1,8 +1,14 @@
 import math
 
-from numba import njit
+from numba import njit, vectorize
 
 target = "cpu"
+
+
+###############################################################################
+@njit(nogil=True, fastmath=True, error_model="numpy")
+def NmE_min():
+    return 0.124e11 * 0.121
 
 
 ###############################################################################
@@ -207,6 +213,17 @@ def _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
         return h
 
 
+@vectorize(
+    "float64(float64, float64, float64, float64, float64, float64, float64)",
+    nopython=True,
+    target=target,
+    fastmath=True,
+)
+def newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
+
+    return _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE)
+
+
 @njit(
     "float64(float64, float64, float64, float64, float64, float64, float64)",
     nogil=True,
@@ -247,7 +264,7 @@ def _newton_hst(NmF2, hmF2, B0, B1, NmE):
 
 
 @njit(
-    "UniTuple(float64, 8)(float64, float64, float64, float64, float64, float64, float64)",
+    "UniTuple(float64, 9)(float64, float64, float64, float64, float64, float64, float64)",
     nogil=True,
     fastmath=True,
     error_model="numpy",
@@ -279,10 +296,15 @@ def _d_region(modip, hour, SAX80, SUX80, NmE, hmE, NmD):
     FP2 = -FP1 * FP1 / 2.0
     FP30 = (-F2 * FP2 - FP1 + 1.0 / F2) / (F2 * F2)
     FP3U = (-F3 * FP2 - FP1 - 1.0 / F3) / (F3 * F3)
-    HDX = hmD + F2
 
+    HDX = hmD + F2
     X = HDX - hmD
     XDX = NmD * math.exp(X * (FP1 + X * (FP2 + X * FP30)))
+
+    if XDX > 0.95 * NmE:
+        NmD = 0.95 * NmE / math.exp(X * (FP1 + X * (FP2 + X * FP30)))
+        XDX = NmD * math.exp(X * (FP1 + X * (FP2 + X * FP30)))
+
     DXDX = XDX * (FP1 + X * (2.0 * FP2 + X * 3.0 * FP30))
     X = hmE - HDX
     XKK = -DXDX * X / (XDX * math.log(XDX / NmE))
@@ -291,9 +313,9 @@ def _d_region(modip, hour, SAX80, SUX80, NmE, hmE, NmD):
         D1 = DXDX / (XDX * XKK * X ** (XKK - 1.0))
     else:
         XKK = 5.0
-        D1 = -math.log(XDX / NmE) / (X**5.0)
+        D1 = -math.log(XDX / NmE) / (X**XKK)
 
-    return hmD, XKK, D1, HDX, FP1, FP2, FP30, FP3U
+    return hmD, XKK, D1, HDX, FP1, FP2, FP30, FP3U, NmD
 
 
 @njit(
@@ -592,8 +614,71 @@ def _soco(doy, hour, lat, lon, height):
     error_model="numpy",
 )
 def _Ne_iri(
-    glat, glon, alt, NmF2, hmF2, B0, B1, PF1, NmF1, NmE, hmE, modip, doy, hour, NmD
-):
+    glat: float,
+    glon: float,
+    alt: float,
+    NmF2: float,
+    hmF2: float,
+    B0: float,
+    B1: float,
+    PF1: float,
+    NmF1: float,
+    NmE: float,
+    hmE: float,
+    modip: float,
+    doy: float,
+    hour: float,
+    NmD: float,
+) -> float:
+    """
+    _Ne_iri _summary_
+
+    Parameters
+    ----------
+    glat : float
+        _description_
+    glon : float
+        _description_
+    alt : float
+        _description_
+    NmF2 : float
+        _description_
+    hmF2 : float
+        _description_
+    B0 : float
+        _description_
+    B1 : float
+        _description_
+    PF1 : float
+        _description_
+    NmF1 : float
+        _description_
+    NmE : float
+        _description_
+    hmE : float
+        _description_
+    modip : float
+        _description_
+    doy : float
+        _description_
+    hour : float
+        _description_
+    NmD : float
+        _description_
+
+    Returns
+    -------
+    float
+        _description_
+
+    Notes
+    -------
+
+    IRI expects the NmF2, NmF1, NmE, NmD to be in m^-3
+    """
+
+    # NmE min
+    NmE = max(NmE, NmE_min())
 
     if alt > hmE:
         # bottomside
@@ -705,9 +790,29 @@ def _Ne_iri(
         # D region
         decl, zenith, sax80, sux80 = _soco(doy, hour, glat, glon, 80.0)
 
-        hmD, DK, D1, HDX, FP1, FP2, FP30, FP3U = _d_region(
+        hmD, DK, D1, HDX, FP1, FP2, FP30, FP3U, NmD = _d_region(
             modip, hour, sax80, sux80, NmE, hmE, NmD
         )
+
+        if alt < 50:
+            return modip
+        elif alt < 51:
+            return hour
+        elif alt < 52:
+            return sax80
+        elif alt < 53:
+            return sux80
+        elif alt < 54:
+            return NmE
+        elif alt < 55:
+            return hmE
+        elif alt < 56:
+            return NmD
+        elif alt < 57:
+            return DK
+        elif alt < 58:
+            return D1
+
         if alt > HDX:
             return NmE * math.exp(-D1 * (hmE - alt) ** DK)
         else:

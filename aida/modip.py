@@ -12,6 +12,9 @@ import h5py
 import numpy as np
 import scipy.interpolate as spInt
 from importlib import resources
+import datetime
+
+from .igrf import inclination, inc2modip
 
 
 ###############################################################################
@@ -23,8 +26,19 @@ class Modip(object):
 
     """
 
-    def __init__(self, InputFile=None):
+    def __init__(
+        self,
+        InputFile=None,
+        use_IGRF: bool = False,
+        igrf_time: datetime.datetime = None,
+    ):
         """ """
+
+        self.use_IGRF = False
+
+        if use_IGRF:
+            self.use_IGRF = True
+
         if InputFile is None:
             InputFile = (
                 resources.files("aida")
@@ -42,6 +56,18 @@ class Modip(object):
             openFile.close()
         else:
             FileNotFoundError(InputFile)
+
+        if self.use_IGRF:
+            date_decimal = (
+                float(igrf_time.year)
+                + float(igrf_time.month - 1) / 12.0
+                + float(igrf_time.day - 1) / 365.0
+            )
+            glon = np.mod(lonModip + 180.0, 360.0) - 180.0
+            glat = np.sign(latModip) * np.abs(np.mod(latModip + 90.0, 180.0) - 90.0)
+            glon, glat = np.meshgrid(glon, glat)
+            inc = inclination(date_decimal, glon, glat)
+            modip = inc2modip(inc, glat)
 
         self.Interpolant = spInt.RectBivariateSpline(
             latModip, lonModip, modip, kx=3, ky=3

@@ -506,26 +506,26 @@ def Ne_iri(
 
     if alt > hmF2:
         # topside
-
+        # must scale NmF2
         return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
     else:
 
-        return _Ne_iri(
+        return 1e-11 * _Ne_iri(
             glat,
             glon,
             alt,
-            NmF2,
+            1e11 * NmF2,
             hmF2,
             B0,
             B1,
             PF1,
-            NmF1,
-            NmE,
+            1e11 * NmF1,
+            1e11 * NmE,
             hmE,
             modip,
             doy,
             hour,
-            NmD,
+            1e11 * NmD,
         )
 
 
@@ -566,20 +566,20 @@ def Ne_iri_stec(
         return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
     else:
 
-        return _Ne_iri_stec(
+        return 1e-11 * _Ne_iri_stec(
             glat,
             glon,
             alt,
-            NmF2,
+            1e11 * NmF2,
             hmF2,
             B0,
             B1,
             PF1,
-            NmF1,
-            NmE,
+            1e11 * NmF1,
+            1e11 * NmE,
             hmE,
             modip,
             doy,
             hour,
-            NmD,
+            1e11 * NmD,
         )
