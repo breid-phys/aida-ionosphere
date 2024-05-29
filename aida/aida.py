@@ -16,7 +16,7 @@ import numpy as np
 import xarray
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, Ne_iri, sph_harmonics, _Nm2sNm
+from .ne import Ne_AIDA, Ne_NeQuick, Ne_iri, Ne_iri_stec, sph_harmonics, _Nm2sNm
 from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
@@ -972,7 +972,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def calcNe(self, lat, lon, alt, grid="1D", particleIndex=None):
+    def calcNe(self, lat, lon, alt, grid="1D", particleIndex=None, stec: bool = False):
         """
         Calculates electron density for a given lat, lon, alt
 
@@ -1045,7 +1045,7 @@ class AIDAState(object):
             Chars = self._calcValueIterator(
                 lat.ravel(), lon.ravel(), particleIndex=particleIndex
             )
-            Ne = self._calcNe(glat=lat, glon=lon, alt=alt, **dict(Chars))
+            Ne = self._calcNe(glat=lat, glon=lon, alt=alt, **dict(Chars), stec=stec)
 
         else:
             alt = np.reshape(alt, (1, 1, alt.size))
@@ -1060,6 +1060,7 @@ class AIDAState(object):
                 glon=np.atleast_3d(lon.ravel()),
                 alt=alt,
                 **dict(Chars),
+                stec=stec,
             )
         if grid == "3D":  # reshape array to get 3d output
             Ne = np.reshape(Ne, (Ne.shape[0], lon.shape[1], lon.shape[0], Ne.shape[2]))
@@ -1070,6 +1071,11 @@ class AIDAState(object):
 
     def _calcNe(self, **kwargs):
         arg_is_xarray = [isinstance(kwargs[key], xarray.DataArray) for key in kwargs]
+
+        if "stec" in kwargs and kwargs["stec"]:
+            IRI_fun = Ne_iri_stec
+        else:
+            IRI_fun = Ne_iri
 
         # if any(arg_is_xarray) and not all(arg_is_xarray):
         #    raise NotImplementedError("mixed xarray/numpy inputs not supported")
@@ -1130,7 +1136,7 @@ class AIDAState(object):
                     modip = kwargs["modip"]
 
                 Ne = xarray.apply_ufunc(
-                    Ne_iri,
+                    IRI_fun,
                     kwargs["glat"],
                     kwargs["glon"],
                     kwargs["alt"],
@@ -1165,7 +1171,7 @@ class AIDAState(object):
                     modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
                 else:
                     modip = kwargs["modip"]
-                Ne = Ne_iri(
+                Ne = IRI_fun(
                     kwargs["glat"],
                     kwargs["glon"],
                     kwargs["alt"],
