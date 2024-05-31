@@ -281,14 +281,14 @@ def _newton_guess(A: float, B1: float) -> float:
     Parameters
     ----------
     A : float
-        _description_
+        ratio of peak to target density (e.g. NmF2/NmF1)
     B1 : float
         IRI Bottomside Shape Parameter (Unitless)
 
     Returns
     -------
-    float
-        _description_
+    h : float
+        approximate altitude where Ne(h)/Nm = A
     """
     lB = math.log(B1)
     lA = math.log(A)
@@ -311,19 +311,22 @@ def _newton_guess(A: float, B1: float) -> float:
 )
 def _newton(A: float, B1: float) -> float:
     """
-    _newton _summary_
+    _newton Newton's method to solve for intermediate layer heights as needed for the IRI.
+        The IRI uses Regula Falsi for root finding, which is slower but guarantees convergence.
+        Since we always know which function is being used, we can guarantee converge with this
+        faster method.
 
     Parameters
     ----------
     A : float
-        _description_
+        ratio of peak to target density (e.g. NmF2/NmF1)
     B1 : float
         IRI Bottomside Shape Parameter (Unitless)
 
     Returns
     -------
-    float
-        _description_
+    h : float
+        altitude where Ne(h)/Nm = A
     """
 
     # this is the tolerance used in all IRI
@@ -361,7 +364,10 @@ def _newton_hmF1(
     NmF2: float, hmF2: float, B0: float, B1: float, NmF1: float, NmE: float, hmE: float
 ) -> float:
     """
-    _newton_hmF1 _summary_
+    _newton_hmF1 uses Newton's method to find the F1 layer height hmF1. hmF1 is defined as
+        the altitude where the F2 layer bottomside profile is equal to NmF1.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Replaces REGFAL in IRIFUN.FOR
 
     Parameters
     ----------
@@ -382,8 +388,12 @@ def _newton_hmF1(
 
     Returns
     -------
-    float
-        _description_
+    hmF1 : float
+        altitude where F2 layer profile equals NmF1
+
+    Notes
+    -------
+    newton_hmF1() is a numpy ufunc wrapper for this function.
     """
 
     if 0.9 * NmF1 < NmE:
@@ -410,7 +420,10 @@ def newton_hmF1(
     NmF2: float, hmF2: float, B0: float, B1: float, NmF1: float, NmE: float, hmE: float
 ) -> float:
     """
-    newton_hmF1 _summary_
+    newton_hmF1 uses Newton's method to find the F1 layer height hmF1. hmF1 is defined as
+        the altitude where the F2 layer bottomside profile is equal to NmF1.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Replaces REGFAL in IRIFUN.FOR
 
     Parameters
     ----------
@@ -431,8 +444,12 @@ def newton_hmF1(
 
     Returns
     -------
-    float
-        _description_
+    hmF1 : float
+        altitude where F2 layer profile equals NmF1
+
+    Notes
+    -------
+    This function is a numpy ufunc created with numba, and supports broadcasting.
     """
     return _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE)
 
@@ -447,7 +464,11 @@ def _newton_hst_F1(
     NmF2: float, hmF2: float, B0: float, B1: float, hmF1: float, C1: float, NmE: float
 ) -> float:
     """
-    _newton_hst_F1 _summary_
+    _newton_hst_F1 uses Newton's method to find the transition height hst. hst is defined as
+        the altitude where the F1 layer bottomside profile is equal to NmE.
+        This function should be used when the F1 layer is present.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Replaces REGFAL in IRIFUN.FOR
 
     Parameters
     ----------
@@ -468,17 +489,17 @@ def _newton_hst_F1(
 
     Returns
     -------
-    float
-        _description_
+    hst : float
+        altitude where F1 layer profile equals NmE
     """
 
     A = NmE / NmF2
 
     hs3 = hmF2 - _newton(A, B1) * B0
 
-    h = hmF1 - hmF1 * (1.0 - hs3 / hmF1) ** (1.0 / (1.0 + C1))
+    hst = hmF1 - hmF1 * (1.0 - hs3 / hmF1) ** (1.0 / (1.0 + C1))
 
-    return h
+    return hst
 
 
 @njit(
@@ -489,7 +510,11 @@ def _newton_hst_F1(
 )
 def _newton_hst(NmF2: float, hmF2: float, B0: float, B1: float, NmE: float) -> float:
     """
-    _newton_hst _summary_
+    _newton_hst uses Newton's method to find the transition height hst. hst is defined as
+        the altitude where the F2 layer bottomside profile is equal to NmE.
+        This function should be used when the F1 layer is NOT present.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Replaces REGFAL in IRIFUN.FOR
 
     Parameters
     ----------
@@ -506,13 +531,13 @@ def _newton_hst(NmF2: float, hmF2: float, B0: float, B1: float, NmE: float) -> f
 
     Returns
     -------
-    float
-        _description_
+    hst : float
+        altitude where F2 layer profile equals NmE
     """
 
     A = NmE / NmF2
-    h = hmF2 - _newton(A, B1) * B0
-    return h
+    hst = hmF2 - _newton(A, B1) * B0
+    return hst
 
 
 @njit(
@@ -524,14 +549,18 @@ def _newton_hst(NmF2: float, hmF2: float, B0: float, B1: float, NmE: float) -> f
 def _d_region(
     modip: float,
     hour: float,
-    SAX80: float,
-    SUX80: float,
+    sunrise80km: float,
+    sunset80km: float,
     NmE: float,
     hmE: float,
     NmD: float,
 ) -> tuple[float, float, float, float, float, float, float, float, float]:
     """
-    _d_region _summary_
+    _d_region calculates the required parameters for modelling the lower E region and D region.
+        If the intermediate D region density Ndx > 0.95 * NmE, this function will modify NmD
+        so that Ndx == 0.95 * NmE. This is to prevent infinite D region densities.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Adapted from IRISUB.FOR
 
     Parameters
     ----------
@@ -539,10 +568,10 @@ def _d_region(
         Modified Magnetic Dip Angle (degrees)
     hour : float
         Local Time (0-24 Decimal Hours))
-    SAX80 : float
-        _description_
-    SUX80 : float
-        _description_
+    sunrise80km : float
+        Sunrise at 80 km altitude (decimal hours)
+    sunset80km : float
+        Sunset at 80 km altitude (decimal hours)
     NmE : float
         E Layer Peak Density (m^-3)
     hmE : float
@@ -553,53 +582,71 @@ def _d_region(
     Returns
     -------
     tuple[float, float, float, float, float, float, float, float, float]
-        _description_
+        hmD : float
+            D layer altitude (km)
+        K : float
+            E region bottomside shape
+        D1 : float
+            E region bottomside thickness
+        hdx : float
+            D region intermediate height (km)
+        FP1 : float
+            D region scale factor
+        FP2 : float
+            D region scale factor
+        FP3top : float
+            D region scale factor above hmD
+        FP3bot : float
+            D region scale factor below hmD
+        NmD : float
+            D Layer Peak Density (m^-3)
+
     """
     amodip = math.fabs(modip)
 
     if amodip >= 18.0:
-        DELA = 1.0 + math.exp(-(amodip - 30.0) / 10.0)
+        scale = 1.0 + math.exp(-(amodip - 30.0) / 10.0)
     else:
-        DELA = 4.32
+        scale = 4.32
 
-    hmD = _hpol(hour, 81.0, 88.0, SAX80, SUX80, 1.0, 1.0)
+    hmD = _hpol(hour, 81.0, 88.0, sunrise80km, sunset80km, 1.0, 1.0)
 
     F1 = _hpol(
         hour,
-        0.02 + 0.03 / DELA,
+        0.02 + 0.03 / scale,
         0.05,
-        SAX80,
-        SUX80,
+        sunrise80km,
+        sunset80km,
         1.0,
         1.0,
     )
-    F2 = _hpol(hour, 4.6, 4.5, SAX80, SUX80, 1.0, 1.0)
-    F3 = _hpol(hour, -11.5, -4.0, SAX80, SUX80, 1.0, 1.0)
+    F2 = _hpol(hour, 4.6, 4.5, sunrise80km, sunset80km, 1.0, 1.0)
+    F3 = _hpol(hour, -11.5, -4.0, sunrise80km, sunset80km, 1.0, 1.0)
 
     FP1 = F1
     FP2 = -FP1 * FP1 / 2.0
-    FP30 = (-F2 * FP2 - FP1 + 1.0 / F2) / (F2 * F2)
-    FP3U = (-F3 * FP2 - FP1 - 1.0 / F3) / (F3 * F3)
+    FP3top = (-F2 * FP2 - FP1 + 1.0 / F2) / (F2 * F2)
+    FP3bot = (-F3 * FP2 - FP1 - 1.0 / F3) / (F3 * F3)
 
-    HDX = hmD + F2
-    X = HDX - hmD
-    XDX = NmD * math.exp(X * (FP1 + X * (FP2 + X * FP30)))
+    hdx = hmD + F2
+    x = hdx - hmD
+    Ndx = NmD * math.exp(x * (FP1 + x * (FP2 + x * FP3top)))
 
-    if XDX > 0.95 * NmE:
-        NmD = 0.95 * NmE / math.exp(X * (FP1 + X * (FP2 + X * FP30)))
-        XDX = NmD * math.exp(X * (FP1 + X * (FP2 + X * FP30)))
+    if Ndx > 0.95 * NmE:
+        NmD = 0.95 * NmE / math.exp(x * (FP1 + x * (FP2 + x * FP3top)))
+        Ndx = NmD * math.exp(x * (FP1 + x * (FP2 + x * FP3top)))
 
-    DXDX = XDX * (FP1 + X * (2.0 * FP2 + X * 3.0 * FP30))
-    X = hmE - HDX
-    XKK = -DXDX * X / (XDX * math.log(XDX / NmE))
+    DXDX = Ndx * (FP1 + x * (2.0 * FP2 + x * 3.0 * FP3top))
+    x = hmE - hdx
+    K = -DXDX * x / (Ndx * math.log(Ndx / NmE))
 
-    if XKK <= 5.0:
-        D1 = DXDX / (XDX * XKK * X ** (XKK - 1.0))
+    if K <= 5.0:
+        D1 = DXDX / (Ndx * K * x ** (K - 1.0))
     else:
-        XKK = 5.0
-        D1 = -math.log(XDX / NmE) / (X**XKK)
+        K = 5.0
+        D1 = -math.log(Ndx / NmE) / (x**K)
 
-    return hmD, XKK, D1, HDX, FP1, FP2, FP30, FP3U, NmD
+    return hmD, K, D1, hdx, FP1, FP2, FP3top, FP3bot, NmD
 
 
 @njit(
@@ -609,118 +656,112 @@ def _d_region(
     error_model="numpy",
 )
 def _tal(
-    SHABR: float, SDELTA: float, SHBR: float, SDTDH0: float
+    hvb: float, depth: float, width: float, dNdh: float
 ) -> tuple[float, float, float, float, float]:
     """
-    _tal _summary_
+    _tal CALCULATES THE COEFFICIENTS SPT FOR THE POLYNOMIAL
+        Y(X)=1+SPT(1)*X**2+SPT(2)*X**3+SPT(3)*X**4+SPT(4)*X**5
+        TO FIT THE VALLEY IN Y, REPRESENTED BY:
+        Y(X=0)=1, THE X VALUE OF THE DEEPEST VALLEY POINT (SHABR),
+        THE PRECENTAGE DEPTH (SDELTA), THE WIDTH (SHBR) AND THE
+        DERIVATIVE DY/DX AT THE UPPER VALLEY BOUNDRY (SDTDH0).
+        IF THERE IS AN UNWANTED ADDITIONAL EXTREMUM IN THE VALLEY
+        REGION, THEN Failed=.TRUE., ELSE Failed=.FALSE..
+        FOR -SDELTA THE COEFF. ARE CALCULATED FOR THE FUNCTION
+        Y(X)=EXP(SPT(1)*X**2+...+SPT(4)*X**5).
+        Adapted from TAL in IRIFUN.FOR
 
     Parameters
     ----------
-    SHABR : float
-        _description_
-    SDELTA : float
-        _description_
-    SHBR : float
-        _description_
-    SDTDH0 : float
-        _description_
+    hvb : float
+        altitude of deepest valley point (km)
+    depth : float
+        percentage depth
+    width : float
+        valley width (hvt - hmE) (km)
+    dNdh : float
+        logarithmic derivative and upper valley boundary
 
     Returns
     -------
     tuple[float, float, float, float, float]
-        _description_
+        X1, X2, X3, X4 are the polynomial factors for finding Ne
+        Failed is > 0.0 if the fit failed
     """
-    #      SUBROUTINE TAL(SHABR,SDELTA,SHBR,SDTDH0,AUS6,SPT)
-    # C-----------------------------------------------------------
-    # C CALCULATES THE COEFFICIENTS SPT FOR THE POLYNOMIAL
-    # C Y(X)=1+SPT(1)*X**2+SPT(2)*X**3+SPT(3)*X**4+SPT(4)*X**5
-    # C TO FIT THE VALLEY IN Y, REPRESENTED BY:
-    # C Y(X=0)=1, THE X VALUE OF THE DEEPEST VALLEY POINT (SHABR),
-    # C THE PRECENTAGE DEPTH (SDELTA), THE WIDTH (SHBR) AND THE
-    # C DERIVATIVE DY/DX AT THE UPPER VALLEY BOUNDRY (SDTDH0).
-    # C IF THERE IS AN UNWANTED ADDITIONAL EXTREMUM IN THE VALLEY
-    # C REGION, THEN AUS6=.TRUE., ELSE AUS6=.FALSE..
-    # C FOR -SDELTA THE COEFF. ARE CALCULATED FOR THE FUNCTION
-    # C Y(X)=EXP(SPT(1)*X**2+...+SPT(4)*X**5).
-    # C-----------------------------------------------------------
-    #      DIMENSION SPT(4)
-    #      LOGICAL AUS6
-    #      AUS6=.FALSE.
-    AUS6 = 0.0
-    if SHBR <= 0.0:
-        AUS6 = 1.0
-        return 0.0, 0.0, 0.0, 0.0, 1.0
 
-    Z1 = -SDELTA / (100.0 * SHABR * SHABR)
-    if not (SDELTA > 0.0):
-        SDELTA = -SDELTA
-        Z1 = math.log(1.0 - SDELTA / 100.0) / (SHABR * SHABR)
+    Failed = 0.0
+    if width <= 0.0:
+        Failed = 1.0
+        return 0.0, 0.0, 0.0, 0.0, Failed
 
-    Z3 = SDTDH0 / (2.0 * SHBR)
-    Z4 = SHABR - SHBR
+    Z1 = -depth / (100.0 * hvb * hvb)
+    if not (depth > 0.0):
+        depth = -depth
+        Z1 = math.log(1.0 - depth / 100.0) / (hvb * hvb)
+
+    Z3 = dNdh / (2.0 * width)
+    Z4 = hvb - width
     SPT4 = (
         2.0
-        * (Z1 * (SHBR - 2.0 * SHABR) * SHBR + Z3 * Z4 * SHABR)
-        / (SHABR * SHBR * Z4 * Z4 * Z4)
+        * (Z1 * (width - 2.0 * hvb) * width + Z3 * Z4 * hvb)
+        / (hvb * width * Z4 * Z4 * Z4)
     )
-    SPT3 = (
-        Z1 * (2.0 * SHBR - 3.0 * SHABR) / (SHABR * Z4 * Z4)
-        - (2.0 * SHABR + SHBR) * SPT4
-    )
-    SPT2 = -2.0 * Z1 / SHABR - 2.0 * SHABR * SPT3 - 3.0 * SHABR * SHABR * SPT4
-    SPT1 = Z1 - SHABR * (SPT2 + SHABR * (SPT3 + SHABR * SPT4))
-    B = 4.0 * SPT3 / (5.0 * SPT4) + SHABR
-    C = -2.0 * SPT1 / (5 * SPT4 * SHABR)
+    SPT3 = Z1 * (2.0 * width - 3.0 * hvb) / (hvb * Z4 * Z4) - (2.0 * hvb + width) * SPT4
+    SPT2 = -2.0 * Z1 / hvb - 2.0 * hvb * SPT3 - 3.0 * hvb * hvb * SPT4
+    SPT1 = Z1 - hvb * (SPT2 + hvb * (SPT3 + hvb * SPT4))
+    B = 4.0 * SPT3 / (5.0 * SPT4) + hvb
+    C = -2.0 * SPT1 / (5 * SPT4 * hvb)
     Z2 = B * B / 4.0 - C
     if Z2 < 0.0:
         # success
-        return SPT1, SPT2, SPT3, SPT4, AUS6
+        return SPT1, SPT2, SPT3, SPT4, Failed
 
     Z3 = math.sqrt(Z2)
     Z1 = B / 2.0
     Z2 = -Z1 + Z3
-    if Z2 > 0.0 and Z2 < SHBR:
-        AUS6 = 1.0
+    if Z2 > 0.0 and Z2 < width:
+        Failed = 1.0
 
     if math.fabs(Z3) > 1.0e-15:
         Z2 = -Z1 - Z3
-        if Z2 > 0.0 and Z2 < SHBR:
-            AUS6 = 1.0
+        if Z2 > 0.0 and Z2 < width:
+            Failed = 1.0
     else:
         Z2 = C / Z2
-        if Z2 > 0.0 and Z2 < SHBR:
-            AUS6 = 1.0
+        if Z2 > 0.0 and Z2 < width:
+            Failed = 1.0
 
-    return SPT1, SPT2, SPT3, SPT4, AUS6
+    return SPT1, SPT2, SPT3, SPT4, Failed
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _enight(hour: float, sax110: float, sux110: float) -> float:
+def _enight(hour: float, sunrise110km: float, sunset110km: float) -> bool:
     """
-    _enight _summary_
+    _enight checks if the E-region is illuminated by the Sun.
 
     Parameters
     ----------
     hour : float
         Local Time (0-24 Decimal Hours))
-    sax110 : float
-        _description_
-    sux110 : float
-        _description_
+    sunrise110km : float
+        Sunrise at 110 km altitude (decimal hours)
+    sunset110km : float
+        Sunset at 110 km altitude (decimal hours)
 
     Returns
     -------
-    float
-        _description_
+    eNight : bool
+        False if E-Region is illuminated
+
     """
 
-    if math.fabs(sax110) > 25.0:
+    if math.fabs(sunrise110km) > 25.0:
         # polar regions
-        return sax110 < 0.0
-    elif sax110 <= sux110:
-        return (hour > sux110) or (hour < sax110)
+        return sunrise110km < 0.0
+    elif sunrise110km <= sunset110km:
+        return (hour > sunset110km) or (hour < sunrise110km)
     else:
-        return (hour > sux110) and (hour < sax110)
+        return (hour > sunset110km) and (hour < sunrise110km)
 
 
 @njit(
@@ -730,67 +771,81 @@ def _enight(hour: float, sax110: float, sux110: float) -> float:
     error_model="numpy",
 )
 def _E_valley(
-    modip: float, hour: float, SAX110: float, SUX110: float, WIDTH: float, seasn: int
+    modip: float,
+    hour: float,
+    sunrise110km: float,
+    sunset110km: float,
+    width: float,
+    seasn: int,
 ) -> tuple[float, float, float, float, float]:
     """
-    _E_valley _summary_
+    _E_valley calculates the polynomial factors needed to calculate the E-valley electron density.
+        If width < 0.0, the default IRI width is calculated and used.
+        If width >= 0.0, the input width is used instead.
+        Uses _tal() to calculate the actual coefficients.
+        If the fit fails, all coefficients are set to 0.0.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+        Adapted from IRISUB.FOR
 
     Parameters
     ----------
     modip : float
         Modified Magnetic Dip Angle (degrees)
     hour : float
-        Local Time (0-24 Decimal Hours))
-    SAX110 : float
-        _description_
-    SUX110 : float
-        _description_
-    WIDTH : float
-        _description_
+        Local Time (0-24 decimal hours)
+    sunrise110km : float
+        Sunrise at 110 km altitude (decimal hours)
+    sunset110km : float
+        Sunset at 110 km altitude (decimal hours)
+    width : float
+        E-Valley width (if > 0.0, calculate width)
     seasn : int
-        _description_
+        Season index (see season)
 
     Returns
     -------
     tuple[float, float, float, float, float]
-        _description_
+        X1, X2, X3, X4 are the polynomial factors for finding Ne
+        width is the E-Valley width
     """
-    XDELS = [5.0, 5.0, 5.0, 10.0]
-    DNDS = [0.016, 0.01, 0.016, 0.016]
+    seasonalDaytimeDepth = [5.0, 5.0, 5.0, 10.0]
+    seasonalDaytimeLogNe = [0.016, 0.01, 0.016, 0.016]
 
     amodip = math.fabs(modip)
 
     if amodip >= 18.0:
-        DELA = 1.0 + math.exp(-(amodip - 30.0) / 10.0)
+        scale = 1.0 + math.exp(-(amodip - 30.0) / 10.0)
     else:
-        DELA = 4.32
+        scale = 4.32
 
-    XDEL = XDELS[seasn - 1] / DELA
-    DNDHBR = DNDS[seasn - 1] / DELA
-    HDEEP = _hpol(hour, 10.5 / DELA, 28.0, SAX110, SUX110, 1.0, 1.0)
-    if WIDTH < 0.0:
-        WIDTH = _hpol(hour, 17.8 / DELA, 45.0 + 22.0 / DELA, SAX110, SUX110, 1.0, 1.0)
+    daytimeDepth = seasonalDaytimeDepth[seasn - 1] / scale
+    daytimeLogNe = seasonalDaytimeLogNe[seasn - 1] / scale
+    hvb = _hpol(hour, 10.5 / scale, 28.0, sunrise110km, sunset110km, 1.0, 1.0)
+    if width < 0.0:
+        width = _hpol(
+            hour, 17.8 / scale, 45.0 + 22.0 / scale, sunrise110km, sunset110km, 1.0, 1.0
+        )
 
-    DEPTH = _hpol(hour, XDEL, 81.0, SAX110, SUX110, 1.0, 1.0)
-    DLNDH = _hpol(hour, DNDHBR, 0.06, SAX110, SUX110, 1.0, 1.0)
+    depth = _hpol(hour, daytimeDepth, 81.0, sunrise110km, sunset110km, 1.0, 1.0)
+    dNdh = _hpol(hour, daytimeLogNe, 0.06, sunrise110km, sunset110km, 1.0, 1.0)
 
-    if DEPTH < 1.0:
-        WIDTH = 0.0
+    if depth < 1.0:
+        width = 0.0
 
-    eNight = _enight(hour, SAX110, SUX110)
+    eNight = _enight(hour, sunrise110km, sunset110km)
     if eNight:
-        DEPTH = -DEPTH
+        depth = -depth
 
-    X1, X2, X3, X4, AUS6 = _tal(HDEEP, DEPTH, WIDTH, DLNDH)
-    if AUS6 > 0.0:
+    X1, X2, X3, X4, Failed = _tal(hvb, depth, width, dNdh)
+    if Failed > 0.0:
         # fitting failed, just make it flat
         X1 = 0.0
         X2 = 0.0
         X3 = 0.0
         X4 = 0.0
-        WIDTH = 0.0
+        width = 0.0
 
-    return X1, X2, X3, X4, WIDTH
+    return X1, X2, X3, X4, width
 
 
 ###############################################################################
@@ -802,38 +857,39 @@ def _E_valley(
     fastmath=True,
     error_model="numpy",
 )
-def _C1(modip: float, hour: float, SR: float, SS: float) -> float:
+def _C1(modip: float, hour: float, sunrise200km: float, sunset200km: float) -> float:
     """
-    _C1 _summary_
+    _C1 returns the IRI F1 layer shape parameter.
+        Adapted from F1_C1 in IRIFUN.FOR
 
     Parameters
     ----------
     modip : float
         Modified Magnetic Dip Angle (degrees)
     hour : float
-        Local Time (0-24 Decimal Hours))
-    SR : float
-        _description_
-    SS : float
-        _description_
+        Local Time (0-24 decimal hours)
+    sunrise200km : float
+        Sunrise at 200 km altitude (decimal hours)
+    sunset200km : float
+        Sunset at 200 km altitude (decimal hours)
 
     Returns
     -------
     float
-        _description_
+        C1 - IRI F1 layer shape parameter
     """
 
     amodip = math.fabs(modip)
 
     if amodip >= 18.0:
-        C10 = 0.09 + 0.11 * _eps_0(amodip, 10.0, 30.0)
+        C1_0 = 0.09 + 0.11 * _eps_0(amodip, 10.0, 30.0)
     else:
-        C10 = 0.1155
+        C1_0 = 0.1155
 
-    if SR == SS:
-        return 2.5 * C10
+    if sunrise200km == sunset200km:
+        return 2.5 * C1_0
 
-    C1 = 2.5 * C10 * math.cos(math.pi * (hour - 12.0) / (SS - SR))
+    C1 = 2.5 * C1_0 * math.cos(math.pi * (hour - 12.0) / (sunset200km - sunrise200km))
 
     return max(C1, 0.0)
 
@@ -848,7 +904,11 @@ def _soco(
     doy: float, hour: float, glat: float, glon: float, alt: float
 ) -> tuple[float, float, float, float]:
     """
-    _soco _summary_
+    _soco s/r to calculate the solar declination, zenith angle, and
+           sunrise & sunset times  - based on Newbern Smith's algorithm
+           [leo mcnamara, 1-sep-86, last modified 16-jun-87]
+           {dieter bilitza, 30-oct-89, modified for IRI application}
+           Adapted from SOCO in IRIFUN.FOR
 
     Parameters
     ----------
@@ -858,52 +918,36 @@ def _soco(
         Local Time (0-24 Decimal Hours))
     glat : float
         Geodetic Latitude (degrees)
-    lon : float
-        _description_
-    height : float
-        _description_
+    glon : float
+        Geodetic Longitude
+    alt : float
+        Altitude (km)
 
     Returns
     -------
     tuple[float, float, float, float]
-        _description_
+        Solar Declination (degrees)
+        Solar Zenith Angle (degrees)
+        Sunrise Time (decimal hours)
+        Sunset Time (decimal hours)
     """
-    #        subroutine soco (ld,t,flat,Elon,height,
-    #     &          DECLIN, ZENITH, SUNRSE, SUNSET)
-    # c--------------------------------------------------------------------
-    # c       s/r to calculate the solar declination, zenith angle, and
-    # c       sunrise & sunset times  - based on Newbern Smith's algorithm
-    # c       [leo mcnamara, 1-sep-86, last modified 16-jun-87]
-    # c       {dieter bilitza, 30-oct-89, modified for IRI application}
-    # c
-    # c in:   ld      local day of year
-    # c       t       local hour (decimal)
-    # c       flat    northern latitude in degrees
-    # c       elon    east longitude in degrees
-    # c		height	height in km
-    # c
-    # c out:  declin      declination of the sun in degrees
-    # c       zenith      zenith angle of the sun in degrees
-    # c       sunrse      local time of sunrise in hours
-    # c       sunset      local time of sunset in hours
-    # c-------------------------------------------------------------------
-    # c
-    # c amplitudes of Fourier coefficients  --  1955 epoch.................
+
+    # amplitudes of Fourier coefficients  --  1955 epoch.................
     p1 = 0.017203534
     p2 = 0.034407068
     p3 = 0.051610602
     p4 = 0.068814136
     p6 = 0.103221204
     humr = math.pi / 12.0
-    # c
-    # c s/r is formulated in terms of WEST longitude.......................
+    #
+    # s/r is formulated in terms of WEST longitude.......................
     wlon = 360.0 - (glon % 360.0)
-    # c
-    # c time of equinox for 1980...........................................
+    #
+    #  time of equinox for 1980...........................................
     td = doy + (hour + wlon / 15.0) / 24.0
     te = td + 0.9369
-    # c
-    # c declination of the sun..............................................
+    #
+    #  declination of the sun..............................................
     dcl = (
         23.256 * math.sin(p1 * (te - 82.242))
         + 0.381 * math.sin(p2 * (te - 44.855))
@@ -915,8 +959,8 @@ def _soco(
 
     declin = dcl
     dc = math.radians(dcl)  # rads now
-    # c
-    # c the equation of time................................................
+    #
+    #  the equation of time................................................
     tf = te - 0.5
     eqt = (
         -7.38 * math.sin(p1 * (tf - 4.0))
@@ -926,10 +970,10 @@ def _soco(
     )
 
     et = math.radians(eqt) / 4.0
-    # c
+
     fa = math.radians(glat)
     phi = humr * (hour - 12.0) + et
-    # c
+
     a = math.sin(fa) * math.sin(dc)
     b = math.cos(fa) * math.cos(dc)
     cosx = a + b * math.cos(phi)
@@ -961,7 +1005,7 @@ def _soco(
     sunrse = -99.0
     if secphi > 0.0 and secphi < 1.0:
         return (declin, zenith, sunrse, sunset)
-    # c
+
     cosx = cosphi
     if abs(cosx) > 1.0:
         cosx = math.copysign(1.0, cosx)
@@ -971,7 +1015,7 @@ def _soco(
     sunrse = (12.0 - phi - et) % 24
     sunset = (12.0 + phi - et) % 24
 
-    # c special case sunrse > sunset
+    # special case sunrse > sunset
     if sunrse > sunset:
         sunx = math.copysign(99.0, glat)
         if doy > 91 and doy < 273:
@@ -992,7 +1036,7 @@ def _soco(
     fastmath=True,
     error_model="numpy",
 )
-def _Ne_iri(
+def _Ne_IRI(
     glat: float,
     glon: float,
     alt: float,
@@ -1010,7 +1054,9 @@ def _Ne_iri(
     NmD: float,
 ) -> float:
     """
-    _Ne_iri _summary_
+    _Ne_IRI returns the complete IRI-like electron density. This profile differs slightly from
+        the IRI-2020 profile, in that it uses corrections for the intermediate height HZ and
+        the parabolic smoothing to meet the top of the E-valley.
 
     Parameters
     ----------
@@ -1048,7 +1094,7 @@ def _Ne_iri(
     Returns
     -------
     float
-        _description_
+        Electron Density (m^-3)
 
     Notes
     -------
@@ -1079,6 +1125,7 @@ def _Ne_iri(
             calc_sun = True
             decl, zenith, sax110, sux110 = _soco(doy, hour, glat, glon, 110.0)
 
+            # supposed to be SAX/SUX 200, but difference is marginal
             C1 = _C1(modip, hour, sax110, sux110)
             hst = _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE)
         else:
@@ -1167,39 +1214,20 @@ def _Ne_iri(
             return 0.0
     else:
         # D region
-        decl, zenith, sax80, sux80 = _soco(doy, hour, glat, glon, 80.0)
+        decl, zenith, sunrise80km, sunset80km = _soco(doy, hour, glat, glon, 80.0)
 
-        hmD, DK, D1, HDX, FP1, FP2, FP30, FP3U, NmD = _d_region(
-            modip, hour, sax80, sux80, NmE, hmE, NmD
+        hmD, DK, D1, HDX, FP1, FP2, FP3top, FP3bot, NmD = _d_region(
+            modip, hour, sunrise80km, sunset80km, NmE, hmE, NmD
         )
-
-        if alt < 50:
-            return modip
-        elif alt < 51:
-            return hour
-        elif alt < 52:
-            return sax80
-        elif alt < 53:
-            return sux80
-        elif alt < 54:
-            return NmE
-        elif alt < 55:
-            return hmE
-        elif alt < 56:
-            return NmD
-        elif alt < 57:
-            return DK
-        elif alt < 58:
-            return D1
 
         if alt > HDX:
             return NmE * math.exp(-D1 * (hmE - alt) ** DK)
         else:
             z = alt - hmD
             if z > 0:
-                FP3 = FP30
+                FP3 = FP3top
             else:
-                FP3 = FP3U
+                FP3 = FP3bot
             return NmD * math.exp(z * (FP1 + z * (FP2 + z * FP3)))
 
 
@@ -1211,7 +1239,7 @@ def _Ne_iri(
     fastmath=True,
     error_model="numpy",
 )
-def _Ne_iri_stec(
+def _Ne_IRI_stec(
     glat: float,
     glon: float,
     alt: float,
@@ -1229,7 +1257,10 @@ def _Ne_iri_stec(
     NmD: float,
 ) -> float:
     """
-    _Ne_iri_stec _summary_
+    _Ne_IRI_stec fast version of IRI bottomside with computationally expensive parts removed.
+        Lower F1 / E-valley / D-region components do not contribute much to TEC and are skipped.
+        Generally within 0.1 TECU of the regular IRI in vTEC.
+        Only to be used when speed is absolutely critical!
 
     Parameters
     ----------
@@ -1267,7 +1298,7 @@ def _Ne_iri_stec(
     Returns
     -------
     float
-        _description_
+        Electron Density (m^-3)
     """
 
     if alt > hmE:
@@ -1288,9 +1319,9 @@ def _Ne_iri_stec(
             hmF1 = 0.0
 
         if hmF1 > 0.0:
-            decl, zenith, sax110, sux110 = _soco(doy, hour, glat, glon, 110.0)
+            decl, zenith, sax200, sux200 = _soco(doy, hour, glat, glon, 200.0)
 
-            C1 = _C1(modip, hour, sax110, sux110)
+            C1 = _C1(modip, hour, sax200, sux200)
 
             A = NmE / NmF2
 

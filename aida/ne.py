@@ -11,7 +11,7 @@ import math
 from numba import float64, guvectorize, vectorize, njit
 import numpy as np
 from scipy.special import expit
-from .iri import _Ne_iri, _Ne_iri_stec
+from .iri import _Ne_IRI, _Ne_IRI_stec
 
 REm = 6371211.266  # Earth's mean radius in meter
 REkm = REm / 1000  # km
@@ -481,7 +481,7 @@ def _Nm2sNm(NmF2, hmF2, B2bot, NmF1, hmF1, B1bot, NmE, hmE, Betop, sNmF1, sNmE):
     target=target,
     fastmath=True,
 )
-def Ne_iri(
+def Ne_IRI(
     glat,
     glon,
     alt,
@@ -510,7 +510,7 @@ def Ne_iri(
         return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
     else:
 
-        return 1e-11 * _Ne_iri(
+        return 1e-11 * _Ne_IRI(
             glat,
             glon,
             alt,
@@ -537,7 +537,7 @@ def Ne_iri(
     target=target,
     fastmath=True,
 )
-def Ne_iri_stec(
+def Ne_IRI_stec(
     glat,
     glon,
     alt,
@@ -566,7 +566,7 @@ def Ne_iri_stec(
         return _topside(glat, glon, alt, NmF2, hmF2, B2top, Nmpt, Hpt, Nmpl, Hpl)
     else:
 
-        return 1e-11 * _Ne_iri_stec(
+        return 1e-11 * _Ne_IRI_stec(
             glat,
             glon,
             alt,

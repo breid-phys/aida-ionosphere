@@ -16,7 +16,7 @@ import numpy as np
 import xarray
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, Ne_iri, Ne_iri_stec, sph_harmonics, _Nm2sNm
+from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics, _Nm2sNm
 from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
@@ -307,7 +307,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def readFile(self, inputFile):
+    def readFile(self, inputFile: str | Path) -> None:
         """
 
         Reads HDF5 file
@@ -397,7 +397,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def saveFile(self, outputFile, is_output: bool = False):
+    def saveFile(self, outputFile: str | Path, is_output: bool = False):
         """
 
         Saves state to HDF5 file
@@ -470,7 +470,7 @@ class AIDAState(object):
         return
 
     ###########################################################################
-    def background(self):
+    def background(self) -> AIDAState:
         """
         returns the background of an AIDAState object
 
@@ -1073,9 +1073,9 @@ class AIDAState(object):
         arg_is_xarray = [isinstance(kwargs[key], xarray.DataArray) for key in kwargs]
 
         if "stec" in kwargs and kwargs["stec"]:
-            IRI_fun = Ne_iri_stec
+            IRI_fun = Ne_IRI_stec
         else:
-            IRI_fun = Ne_iri
+            IRI_fun = Ne_IRI
 
         # if any(arg_is_xarray) and not all(arg_is_xarray):
         #    raise NotImplementedError("mixed xarray/numpy inputs not supported")
@@ -1129,7 +1129,7 @@ class AIDAState(object):
                     chi,
                 )
             elif self.Parameterization == "IRI":
-                hour, doy = self._iri_time(kwargs["glon"])
+                hour, doy = self._IRI_time(kwargs["glon"])
                 if "modip" not in kwargs:
                     modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
                 else:
@@ -1166,7 +1166,7 @@ class AIDAState(object):
             elif self.Parameterization == "AIDA":
                 Ne = self._calcNe_AIDA(**kwargs)
             elif self.Parameterization == "IRI":
-                hour, doy = self._iri_time(kwargs["glon"])
+                hour, doy = self._IRI_time(kwargs["glon"])
                 if "modip" not in kwargs:
                     modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
                 else:
@@ -1657,7 +1657,7 @@ class AIDAState(object):
 
         return Config
 
-    def _iri_time(self, lon: float):
+    def _IRI_time(self, lon: float):
         time = epoch2dt(self.Time)
         hour = np.mod((lon / 15 + time.hour + time.minute / 60), 24.0)
 
