@@ -960,7 +960,7 @@ class AIDAState(object):
             Output["NmD"] = 1e11 * Output["NmD"]
 
         if MUF3000:
-            x = np.fmax(np.fmin(Output["foF2"] / Output["foE"], 1e6), 1.7)
+            x = np.clip(Output["foF2"] / Output["foE"], 1.7, 1e6)
 
             a = 1890 - 355 / (x - 1.4)
             b = (2.5 * x - 3) ** (-2.35) - 1.6
