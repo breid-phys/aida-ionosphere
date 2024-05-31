@@ -7,13 +7,43 @@ target = "cpu"
 
 ###############################################################################
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def NmE_min():
+def NmE_min() -> float:
+    """
+    NmE_min returns the absolute minimum NmE possible in the IRI, corresponding to a minimum of
+        solar activity where F107_365 = 60 s.f.u.
+
+    Returns
+    -------
+    NmE_min : float
+        IRI Minimum NmE
+    """
     return 0.124e11 * 0.121
 
 
 ###############################################################################
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _season(doy, glat):
+def _season(doy: float, glat: float) -> int:
+    """
+    _season is the integer season index used in the IRI, with Spring starting of Day of Year 45.
+        Seasons in the Southern hemisphere are adjusted to match (i.e. Autumn starts on DoY 45)
+
+    Parameters
+    ----------
+    doy : float
+        Day Of Year
+    glat : float
+        Geodetic Latitude (degrees)
+
+    Returns
+    -------
+    season : int
+
+        Spring = 1
+        Summer = 2
+        Autumn = 3
+        Winter = 4
+
+    """
     seasn = int((doy + 45.0) / 92.0)
     if glat < 0.0:
         seasn = seasn - 2
@@ -24,14 +54,30 @@ def _season(doy, glat):
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _eps_0(x, sc, hx):
+def _eps_0(x: float, sc: float, hx: float) -> float:
     """
-    IRI epstein 0
+    _eps_0 Epstein_0 sigmoid function used in IRI to smoothly step between values.
+        Adapted from EPST in IRIFUN.FOR
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+
+    Parameters
+    ----------
+    x : float
+        Argument
+    sc : float
+        Thickness
+    hx : float
+        Center
+
+    Returns
+    -------
+    float
+        Value on (0, 1)
     """
     ARGMAX = 87.3
     D1 = (x - hx) / sc
     if math.fabs(D1) < ARGMAX:
-        return 1 / (1 + math.exp(-D1))
+        return 1.0 / (1.0 + math.exp(-D1))
     else:
         return math.copysign(1.0, D1)
 
@@ -40,14 +86,30 @@ def _eps_0(x, sc, hx):
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _eptr(x, sc, hx):
+def _eptr(x: float, sc: float, hx: float) -> float:
     """
-    IRI epstein 0
+    _eptr Epstein_-1 transition function used in IRI to smoothly step between values.
+        Adapted from EPTR in IRIFUN.FOR
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+
+    Parameters
+    ----------
+    x : float
+        Argument
+    sc : float
+        Thickness
+    hx : float
+        Center
+
+    Returns
+    -------
+    float
+        Value on (0, +inf)
     """
     ARGMAX = 87.3
     D1 = (x - hx) / sc
     if math.fabs(D1) < ARGMAX:
-        return math.log(1 + math.exp(D1))
+        return math.log(1.0 + math.exp(D1))
     else:
         return max(0.0, D1)
 
@@ -56,9 +118,40 @@ def _eptr(x, sc, hx):
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _hpol(t, YD, YN, SR, SS, DSA, DSU):
+def _hpol(
+    t: float, YD: float, YN: float, SR: float, SS: float, DSA: float, DSU: float
+) -> float:
     """
-    IRI hpol function
+    _hpol IRI transition function to smoothly convert between two values. Usually used for
+        day-night transitions.
+        Adapted from HPOL in IRIFUN.FOR
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+
+    Parameters
+    ----------
+    t : float
+        Time of day (decimal hours)
+    YD : float
+        Daytime value
+    YN : float
+        Nigthttime value
+    SR : float
+        Sunrise Local Time (decimal hours)
+    SS : float
+        Sunset Local Time (decimal hours)
+    DSA : float
+        Sunrise Step Width
+    DSU : float
+        Sunset Step Width
+
+    Returns
+    -------
+    float
+        Value on (YD, YN)
+
+    Notes
+    -------
+    See also _eps_0, _soco
     """
     if math.fabs(SS) > 25.0:
         if SS > 0.0:
@@ -78,7 +171,24 @@ def _hpol(t, YD, YN, SR, SS, DSA, DSU):
     fastmath=True,
     error_model="numpy",
 )
-def _xe2(x, B1):
+def _xe2(x: float, B1: float) -> float:
+    """
+    _xe2 IRI Bottomside function. Needs to be multiplied by the peak density (NmF2 or NmF1).
+        Equivalent to XE2 in IRIFUN.FOR
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+
+    Parameters
+    ----------
+    x : float
+        (h - alt) / B (Unitless)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+
+    Returns
+    -------
+    float
+        Electron Density (as fraction of peak density)
+    """
     return math.exp(-(math.pow(x, B1))) / math.cosh(x)
 
 
@@ -91,7 +201,22 @@ def _xe2(x, B1):
     fastmath=True,
     error_model="numpy",
 )
-def _dxe2(x, B1):
+def _dxe2(x: float, B1: float) -> float:
+    """
+    _dxe2 Derivative of IRI bottomside function XE2. Used for root-finding.
+
+    Parameters
+    ----------
+    x : float
+        (h - alt) / B (Unitless)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+
+    Returns
+    -------
+    float
+        Derivative of XE2 at x
+    """
     return -_xe2(x, B1) * (math.tanh(x) + B1 * math.pow(x, B1 - 1.0))
 
 
@@ -99,17 +224,44 @@ def _dxe2(x, B1):
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _h_star(hmF1, C1, h):
+def _h_star(hmF1: float, C1: float, h: float) -> float:
     """
-    IRI h*
+    _h_star give the modified height h* used for the F1 layer in the IRI.
+        See Bilitza et al. 2022 doi:10.1029/2022RG000792
+
+    Parameters
+    ----------
+    hmF1 : float
+        F1 Layer Peak Altitude (km)
+    C1 : float
+        IRI F1 Layer Shape Parameter (Unitless)
+    h : float
+        height (km)
+
+    Returns
+    -------
+    float
+        modified height h*
     """
     return hmF1 * (1.0 - ((hmF1 - h) / hmF1) ** (1.0 + C1))
 
 
 ###############################################################################
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _raw_asech(x):
-    # pure python version
+def _asech(x: float) -> float:
+    """
+    _asech Inverse hypoerbolic secant.
+
+    Parameters
+    ----------
+    x : float
+        (h - alt) / B (Unitless)
+
+    Returns
+    -------
+    float
+        arcsech(x)
+    """
     ix = 1.0 / x
     return math.log(ix + math.sqrt(ix * ix - 1.0))
 
@@ -120,7 +272,24 @@ def _raw_asech(x):
     fastmath=True,
     error_model="numpy",
 )
-def _newton_guess(A, B1):
+def _newton_guess(A: float, B1: float) -> float:
+    """
+    _newton_guess returns an initial guess for root finding.
+        Gives a result within 0.01 for most values of A and B1 likely to occur for physically
+        realistic profiles.
+
+    Parameters
+    ----------
+    A : float
+        _description_
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+
+    Returns
+    -------
+    float
+        _description_
+    """
     lB = math.log(B1)
     lA = math.log(A)
 
@@ -129,7 +298,7 @@ def _newton_guess(A, B1):
     XB3 = -0.049711817247645 + 0.080686056815511 * lB
 
     x = (XB1 * lA + XB2 * lA**2 + XB3 * lA**3) ** (1.0 / B1)
-    x = min(x, _raw_asech(A))
+    x = min(x, _asech(A))
     return x
 
 
@@ -140,8 +309,22 @@ def _newton_guess(A, B1):
     fastmath=True,
     error_model="numpy",
 )
-def _newton(A, B1):
-    """ """
+def _newton(A: float, B1: float) -> float:
+    """
+    _newton _summary_
+
+    Parameters
+    ----------
+    A : float
+        _description_
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+
+    Returns
+    -------
+    float
+        _description_
+    """
 
     # this is the tolerance used in all IRI
     tol = 0.01
@@ -174,28 +357,32 @@ def _newton(A, B1):
     fastmath=True,
     error_model="numpy",
 )
-def _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
+def _newton_hmF1(
+    NmF2: float, hmF2: float, B0: float, B1: float, NmF1: float, NmE: float, hmE: float
+) -> float:
     """
-    _regfal_hmF1 Regula Falsi (internal use only)
+    _newton_hmF1 _summary_
 
     Parameters
     ----------
-    NmF2 : _type_
-        _description_
-    NmF1 : _type_
-        _description_
-    hmF2 : _type_
-        _description_
-    hmE : _type_
-        _description_
-    B0 : _type_
-        _description_
-    B1 : _type_
-        _description_
+    NmF2 : float
+        F2 Layer Peak Density (m^-3)
+    hmF2 : float
+        F2 Layer Peak Altitude (km)
+    B0 : float
+        IRI Bottomside Thickness Parameter (km)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+    NmF1 : float
+        F1 Layer Peak Density (m^-3)
+    NmE : float
+        E Layer Peak Density (m^-3)
+    hmE : float
+        E Layer Peak Altitude (km)
 
     Returns
     -------
-    _type_
+    float
         _description_
     """
 
@@ -219,8 +406,34 @@ def _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
     target=target,
     fastmath=True,
 )
-def newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
+def newton_hmF1(
+    NmF2: float, hmF2: float, B0: float, B1: float, NmF1: float, NmE: float, hmE: float
+) -> float:
+    """
+    newton_hmF1 _summary_
 
+    Parameters
+    ----------
+    NmF2 : float
+        F2 Layer Peak Density (m^-3)
+    hmF2 : float
+        F2 Layer Peak Altitude (km)
+    B0 : float
+        IRI Bottomside Thickness Parameter (km)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+    NmF1 : float
+        F1 Layer Peak Density (m^-3)
+    NmE : float
+        E Layer Peak Density (m^-3)
+    hmE : float
+        E Layer Peak Altitude (km)
+
+    Returns
+    -------
+    float
+        _description_
+    """
     return _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE)
 
 
@@ -230,11 +443,33 @@ def newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE):
     fastmath=True,
     error_model="numpy",
 )
-def _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE):
+def _newton_hst_F1(
+    NmF2: float, hmF2: float, B0: float, B1: float, hmF1: float, C1: float, NmE: float
+) -> float:
     """
-    _regfal_hst Regula Falsi (internal use only)
-    F1 layer present
+    _newton_hst_F1 _summary_
 
+    Parameters
+    ----------
+    NmF2 : float
+        F2 Layer Peak Density (m^-3)
+    hmF2 : float
+        F2 Layer Peak Altitude (km)
+    B0 : float
+        IRI Bottomside Thickness Parameter (km)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+    hmF1 : float
+        F1 Layer Peak Altitude (km)
+    C1 : float
+        IRI F1 Layer Shape Parameter (Unitless)
+    NmE : float
+        E Layer Peak Density (m^-3)
+
+    Returns
+    -------
+    float
+        _description_
     """
 
     A = NmE / NmF2
@@ -252,10 +487,27 @@ def _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE):
     fastmath=True,
     error_model="numpy",
 )
-def _newton_hst(NmF2, hmF2, B0, B1, NmE):
+def _newton_hst(NmF2: float, hmF2: float, B0: float, B1: float, NmE: float) -> float:
     """
-    _regfal_hst Regula Falsi (internal use only)
+    _newton_hst _summary_
 
+    Parameters
+    ----------
+    NmF2 : float
+        F2 Layer Peak Density (m^-3)
+    hmF2 : float
+        F2 Layer Peak Altitude (km)
+    B0 : float
+        IRI Bottomside Thickness Parameter (km)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+    NmE : float
+        E Layer Peak Density (m^-3)
+
+    Returns
+    -------
+    float
+        _description_
     """
 
     A = NmE / NmF2
@@ -269,8 +521,40 @@ def _newton_hst(NmF2, hmF2, B0, B1, NmE):
     fastmath=True,
     error_model="numpy",
 )
-def _d_region(modip, hour, SAX80, SUX80, NmE, hmE, NmD):
+def _d_region(
+    modip: float,
+    hour: float,
+    SAX80: float,
+    SUX80: float,
+    NmE: float,
+    hmE: float,
+    NmD: float,
+) -> tuple[float, float, float, float, float, float, float, float, float]:
+    """
+    _d_region _summary_
 
+    Parameters
+    ----------
+    modip : float
+        Modified Magnetic Dip Angle (degrees)
+    hour : float
+        Local Time (0-24 Decimal Hours))
+    SAX80 : float
+        _description_
+    SUX80 : float
+        _description_
+    NmE : float
+        E Layer Peak Density (m^-3)
+    hmE : float
+        E Layer Peak Altitude (km)
+    NmD : float
+        D Layer Peak Density (m^-3)
+
+    Returns
+    -------
+    tuple[float, float, float, float, float, float, float, float, float]
+        _description_
+    """
     amodip = math.fabs(modip)
 
     if amodip >= 18.0:
@@ -324,7 +608,28 @@ def _d_region(modip, hour, SAX80, SUX80, NmE, hmE, NmD):
     fastmath=True,
     error_model="numpy",
 )
-def _tal(SHABR, SDELTA, SHBR, SDTDH0):
+def _tal(
+    SHABR: float, SDELTA: float, SHBR: float, SDTDH0: float
+) -> tuple[float, float, float, float, float]:
+    """
+    _tal _summary_
+
+    Parameters
+    ----------
+    SHABR : float
+        _description_
+    SDELTA : float
+        _description_
+    SHBR : float
+        _description_
+    SDTDH0 : float
+        _description_
+
+    Returns
+    -------
+    tuple[float, float, float, float, float]
+        _description_
+    """
     #      SUBROUTINE TAL(SHABR,SDELTA,SHBR,SDTDH0,AUS6,SPT)
     # C-----------------------------------------------------------
     # C CALCULATES THE COEFFICIENTS SPT FOR THE POLYNOMIAL
@@ -390,7 +695,24 @@ def _tal(SHABR, SDELTA, SHBR, SDTDH0):
 
 
 @njit(nogil=True, fastmath=True, error_model="numpy")
-def _enight(hour, sax110, sux110):
+def _enight(hour: float, sax110: float, sux110: float) -> float:
+    """
+    _enight _summary_
+
+    Parameters
+    ----------
+    hour : float
+        Local Time (0-24 Decimal Hours))
+    sax110 : float
+        _description_
+    sux110 : float
+        _description_
+
+    Returns
+    -------
+    float
+        _description_
+    """
 
     if math.fabs(sax110) > 25.0:
         # polar regions
@@ -407,12 +729,31 @@ def _enight(hour, sax110, sux110):
     fastmath=True,
     error_model="numpy",
 )
-def _E_valley(modip, hour, SAX110, SUX110, WIDTH, seasn):
+def _E_valley(
+    modip: float, hour: float, SAX110: float, SUX110: float, WIDTH: float, seasn: int
+) -> tuple[float, float, float, float, float]:
     """
-    E-layer valley
-    WIDTH = hvt - hmE
+    _E_valley _summary_
 
-    if WIDTH < 0.0 then WIDTH will be calculated using the IRI
+    Parameters
+    ----------
+    modip : float
+        Modified Magnetic Dip Angle (degrees)
+    hour : float
+        Local Time (0-24 Decimal Hours))
+    SAX110 : float
+        _description_
+    SUX110 : float
+        _description_
+    WIDTH : float
+        _description_
+    seasn : int
+        _description_
+
+    Returns
+    -------
+    tuple[float, float, float, float, float]
+        _description_
     """
     XDELS = [5.0, 5.0, 5.0, 10.0]
     DNDS = [0.016, 0.01, 0.016, 0.016]
@@ -461,10 +802,25 @@ def _E_valley(modip, hour, SAX110, SUX110, WIDTH, seasn):
     fastmath=True,
     error_model="numpy",
 )
-def _C1(modip, hour, SR, SS):
+def _C1(modip: float, hour: float, SR: float, SS: float) -> float:
     """
-    F1 layer shape parameters
+    _C1 _summary_
 
+    Parameters
+    ----------
+    modip : float
+        Modified Magnetic Dip Angle (degrees)
+    hour : float
+        Local Time (0-24 Decimal Hours))
+    SR : float
+        _description_
+    SS : float
+        _description_
+
+    Returns
+    -------
+    float
+        _description_
     """
 
     amodip = math.fabs(modip)
@@ -488,7 +844,30 @@ def _C1(modip, hour, SR, SS):
     fastmath=True,
     error_model="numpy",
 )
-def _soco(doy, hour, lat, lon, height):
+def _soco(
+    doy: float, hour: float, glat: float, glon: float, alt: float
+) -> tuple[float, float, float, float]:
+    """
+    _soco _summary_
+
+    Parameters
+    ----------
+    doy : float
+        Day Of Year
+    hour : float
+        Local Time (0-24 Decimal Hours))
+    glat : float
+        Geodetic Latitude (degrees)
+    lon : float
+        _description_
+    height : float
+        _description_
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        _description_
+    """
     #        subroutine soco (ld,t,flat,Elon,height,
     #     &          DECLIN, ZENITH, SUNRSE, SUNSET)
     # c--------------------------------------------------------------------
@@ -518,7 +897,7 @@ def _soco(doy, hour, lat, lon, height):
     humr = math.pi / 12.0
     # c
     # c s/r is formulated in terms of WEST longitude.......................
-    wlon = 360.0 - (lon % 360.0)
+    wlon = 360.0 - (glon % 360.0)
     # c
     # c time of equinox for 1980...........................................
     td = doy + (hour + wlon / 15.0) / 24.0
@@ -548,7 +927,7 @@ def _soco(doy, hour, lat, lon, height):
 
     et = math.radians(eqt) / 4.0
     # c
-    fa = math.radians(lat)
+    fa = math.radians(glat)
     phi = humr * (hour - 12.0) + et
     # c
     a = math.sin(fa) * math.sin(dc)
@@ -562,7 +941,7 @@ def _soco(doy, hour, lat, lon, height):
     # calculate sunrise and sunset times --  at the ground...........
     # see Explanatory Supplement to the Ephemeris (1961) pg 401......
     # sunrise at height h metres is at...............................
-    h = height * 1000.0
+    h = alt * 1000.0
     chih = 90.83 + 0.0347 * math.sqrt(h)
     # this includes corrections for horizontal refraction and........
     # semi-diameter of the solar disk................................
@@ -594,7 +973,7 @@ def _soco(doy, hour, lat, lon, height):
 
     # c special case sunrse > sunset
     if sunrse > sunset:
-        sunx = math.copysign(99.0, lat)
+        sunx = math.copysign(99.0, glat)
         if doy > 91 and doy < 273:
             sunset = sunx
             sunrse = sunx
@@ -636,35 +1015,35 @@ def _Ne_iri(
     Parameters
     ----------
     glat : float
-        _description_
+        Geodetic Latitude (degrees)
     glon : float
-        _description_
+        Geodetic Longitude (degrees)
     alt : float
-        _description_
+        altitude (km)
     NmF2 : float
-        _description_
+        F2 Layer Peak Density (m^-3)
     hmF2 : float
-        _description_
+        F2 Layer Peak Altitude (km)
     B0 : float
-        _description_
+        IRI Bottomside Thickness Parameter (km)
     B1 : float
-        _description_
+        IRI Bottomside Shape Parameter (Unitless)
     PF1 : float
-        _description_
+        Probability of F1 Layer (0-1)
     NmF1 : float
-        _description_
+        F1 Layer Peak Density (m^-3)
     NmE : float
-        _description_
+        E Layer Peak Density (m^-3)
     hmE : float
-        _description_
+        E Layer Peak Altitude (km)
     modip : float
-        _description_
+        Modified Magnetic Dip Angle (degrees)
     doy : float
-        _description_
+        Day Of Year
     hour : float
-        _description_
+        Local Time (0-24 Decimal Hours))
     NmD : float
-        _description_
+        D Layer Peak Density (m^-3)
 
     Returns
     -------
@@ -833,8 +1212,63 @@ def _Ne_iri(
     error_model="numpy",
 )
 def _Ne_iri_stec(
-    glat, glon, alt, NmF2, hmF2, B0, B1, PF1, NmF1, NmE, hmE, modip, doy, hour, NmD
-):
+    glat: float,
+    glon: float,
+    alt: float,
+    NmF2: float,
+    hmF2: float,
+    B0: float,
+    B1: float,
+    PF1: float,
+    NmF1: float,
+    NmE: float,
+    hmE: float,
+    modip: float,
+    doy: float,
+    hour: float,
+    NmD: float,
+) -> float:
+    """
+    _Ne_iri_stec _summary_
+
+    Parameters
+    ----------
+    glat : float
+        Geodetic Latitude (degrees)
+    glon : float
+        Geodetic Longitude (degrees)
+    alt : float
+        altitude (km)
+    NmF2 : float
+        F2 Layer Peak Density (m^-3)
+    hmF2 : float
+        F2 Layer Peak Altitude (km)
+    B0 : float
+        IRI Bottomside Thickness Parameter (km)
+    B1 : float
+        IRI Bottomside Shape Parameter (Unitless)
+    PF1 : float
+        Probability of F1 Layer (0-1)
+    NmF1 : float
+        F1 Layer Peak Density (m^-3)
+    NmE : float
+        E Layer Peak Density (m^-3)
+    hmE : float
+        E Layer Peak Altitude (km)
+    modip : float
+        Modified Magnetic Dip Angle (degrees)
+    doy : float
+        Day Of Year
+    hour : float
+        Local Time (0-24 Decimal Hours)
+    NmD : float
+        D Layer Peak Density (m^-3)
+
+    Returns
+    -------
+    float
+        _description_
+    """
 
     if alt > hmE:
         # bottomside
