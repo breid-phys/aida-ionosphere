@@ -34,10 +34,7 @@ class Modip(object):
     ):
         """ """
 
-        self.use_IGRF = False
-
-        if use_IGRF:
-            self.use_IGRF = True
+        self.use_IGRF = use_IGRF
 
         if InputFile is None:
             InputFile = (
