@@ -16,7 +16,8 @@ import numpy as np
 import xarray
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, sph_harmonics, _Nm2sNm
+from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics, _Nm2sNm
+from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
@@ -117,12 +118,30 @@ class AIDAState(object):
         "Hpt",
     ]
 
+    # IRI Char names
+    IRICharNames = [
+        "NmF2",
+        "hmF2",
+        "B2top",
+        "B0",
+        "B1",
+        "NmF1",
+        "PF1",
+        "NmE",
+        "hmE",
+        "NmD",
+        "Nmpl",
+        "Hpl",
+        "Nmpt",
+        "Hpt",
+    ]
+
     npsmNames = ["Nmpl", "Hpl", "Nmpt", "Hpt"]
 
-    fluxNames = [
-        "NeQuickFluxfoF2",
-        "NeQuickFluxMUF3000",
-        "NeQuickFluxEF1",
+    IRIfluxNames = ["NPSMFlux", "F107", "F107_81", "F107_365", "IG12", "Rz12"]
+
+    NeQuickfluxNames = [
+        "NeQuickFlux",
         "NPSMFlux",
     ]
 
@@ -208,9 +227,14 @@ class AIDAState(object):
 
         return
 
-    def __str__(self):
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def __repr__(self) -> str:
         out = ""
         for attr in self.__dict__:
+            if attr[0] == "_":
+                continue
             out += f"{attr}: {getattr(self, attr)}\n"
         return out
 
@@ -229,13 +253,21 @@ class AIDAState(object):
             and hasattr(self, "_Parameterization")
             and value.lower() != self._Parameterization.lower()
         ):
-            raise ConfigurationMismatch(" state parameterization does not match input file")
+            raise ConfigurationMismatch(
+                " state parameterization does not match input file"
+            )
         elif value.lower() == "nequick":
             self._Parameterization = "NeQuick"
             self.CharNames = AIDAState.NeQuickCharNames
+            self.fluxNames = AIDAState.NeQuickfluxNames
         elif value.lower() == "aida":
             self._Parameterization = "AIDA"
             self.CharNames = AIDAState.AIDACharNames
+            self.fluxNames = AIDAState.NeQuickfluxNames
+        elif value.lower() == "iri":
+            self._Parameterization = "IRI"
+            self.CharNames = AIDAState.IRICharNames
+            self.fluxNames = AIDAState.IRIfluxNames
         else:
             raise ValueError(f"Invalid parameterization {value}")
 
@@ -275,7 +307,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def readFile(self, inputFile):
+    def readFile(self, inputFile: str | Path) -> None:
         """
 
         Reads HDF5 file
@@ -365,7 +397,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def saveFile(self, outputFile, is_output: bool = False):
+    def saveFile(self, outputFile: str | Path, is_output: bool = False):
         """
 
         Saves state to HDF5 file
@@ -438,7 +470,7 @@ class AIDAState(object):
         return
 
     ###########################################################################
-    def background(self):
+    def background(self) -> AIDAState:
         """
         returns the background of an AIDAState object
 
@@ -639,7 +671,7 @@ class AIDAState(object):
                     "units": "km",
                     "description": f"altitude of the {Char[2:]} layer peak density",
                 }
-            elif "B" == Char[0]:
+            elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
                 if Char[1] == "e":
@@ -872,18 +904,31 @@ class AIDAState(object):
             else:
                 Output[Char] = np.reshape(Output[Char], Size["2DShape"][1:])
 
-        # calculated separately so that bottomside effects can occur (B2bot)
-        NmF1 = self._calcNe(glat=glat, glon=glon, alt=Output["hmF1"], **Output)
-        NmE = self._calcNe(glat=glat, glon=glon, alt=Output["hmE"], **Output)
+        if self.Parameterization == "IRI":
+            Output["hmF1"] = newton_hmF1(
+                Output["NmF2"],
+                Output["hmF2"],
+                Output["B0"],
+                Output["B1"],
+                Output["NmF1"],
+                Output["NmE"],
+                Output["hmE"],
+            )
+            NmF1 = Output["NmF1"] * 1e11
+            NmE = np.fmax(Output["NmE"] * 1e11, NmE_min())
+        else:
+            # calculated separately so that bottomside effects can occur (B2bot)
+            NmF1 = self._calcNe(glat=glat, glon=glon, alt=Output["hmF1"], **Output)
+            NmE = self._calcNe(glat=glat, glon=glon, alt=Output["hmE"], **Output)
 
         chi, cchi = self.solzen(glat, glon)
         NmF1 = np.where(chi < 90.0, NmF1, np.nan)
 
         if self.Parameterization == "NeQuick":
-            sNmF1 = Output["sNmF1"]
-            sNmE = Output["sNmE"]
+            mask_NmF1 = Output["sNmF1"]
+            mask_NmE = Output["sNmE"]
         elif self.Parameterization == "AIDA":
-            sNmF1, sNmE = _Nm2sNm(
+            mask_NmF1, mask_NmE = _Nm2sNm(
                 Output["NmF2"],
                 Output["hmF2"],
                 Output["B2bot"],
@@ -894,9 +939,13 @@ class AIDAState(object):
                 Output["hmE"],
                 Output["Betop"],
             )
+        elif self.Parameterization == "IRI":
+            # only used for NmF1 masking
+            mask_NmF1 = Output["PF1"] - 0.5
+            mask_NmE = np.ones_like(Output["NmE"])
 
-        Output["NmF1"] = np.where(sNmF1 > 0.0, NmF1, np.nan)
-        Output["NmE"] = np.where(sNmE > 0.0, NmE, np.nan)
+        Output["NmF1"] = np.where(mask_NmF1 > 0.0, NmF1, np.nan)
+        Output["NmE"] = np.where(mask_NmE > 0.0, NmE, np.nan)
 
         Output["foE"] = np.sqrt(Output["NmE"] / 0.124e11)
 
@@ -907,8 +956,11 @@ class AIDAState(object):
         Output["NmF2"] = np.fmax(Output["NmF2"], 0.0)
         Output["foF2"] = np.sqrt(Output["NmF2"] / 0.124e11)
 
+        if "NmD" in Output:
+            Output["NmD"] = 1e11 * Output["NmD"]
+
         if MUF3000:
-            x = np.fmax(np.fmin(Output["foF2"] / Output["foE"], 1e6), 1.7)
+            x = np.clip(Output["foF2"] / Output["foE"], 1.7, 1e6)
 
             a = 1890 - 355 / (x - 1.4)
             b = (2.5 * x - 3) ** (-2.35) - 1.6
@@ -920,7 +972,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def calcNe(self, lat, lon, alt, grid="1D", particleIndex=None):
+    def calcNe(self, lat, lon, alt, grid="1D", particleIndex=None, stec: bool = False):
         """
         Calculates electron density for a given lat, lon, alt
 
@@ -993,7 +1045,7 @@ class AIDAState(object):
             Chars = self._calcValueIterator(
                 lat.ravel(), lon.ravel(), particleIndex=particleIndex
             )
-            Ne = self._calcNe(glat=lat, glon=lon, alt=alt, **dict(Chars))
+            Ne = self._calcNe(glat=lat, glon=lon, alt=alt, **dict(Chars), stec=stec)
 
         else:
             alt = np.reshape(alt, (1, 1, alt.size))
@@ -1008,6 +1060,7 @@ class AIDAState(object):
                 glon=np.atleast_3d(lon.ravel()),
                 alt=alt,
                 **dict(Chars),
+                stec=stec,
             )
         if grid == "3D":  # reshape array to get 3d output
             Ne = np.reshape(Ne, (Ne.shape[0], lon.shape[1], lon.shape[0], Ne.shape[2]))
@@ -1018,6 +1071,11 @@ class AIDAState(object):
 
     def _calcNe(self, **kwargs):
         arg_is_xarray = [isinstance(kwargs[key], xarray.DataArray) for key in kwargs]
+
+        if "stec" in kwargs and kwargs["stec"]:
+            IRI_fun = Ne_IRI_stec
+        else:
+            IRI_fun = Ne_IRI
 
         # if any(arg_is_xarray) and not all(arg_is_xarray):
         #    raise NotImplementedError("mixed xarray/numpy inputs not supported")
@@ -1070,6 +1128,36 @@ class AIDAState(object):
                     kwargs["Hpl"],
                     chi,
                 )
+            elif self.Parameterization == "IRI":
+                hour, doy = self._IRI_time(kwargs["glon"])
+                if "modip" not in kwargs:
+                    modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
+                else:
+                    modip = kwargs["modip"]
+
+                Ne = xarray.apply_ufunc(
+                    IRI_fun,
+                    kwargs["glat"],
+                    kwargs["glon"],
+                    kwargs["alt"],
+                    kwargs["NmF2"],
+                    kwargs["hmF2"],
+                    kwargs["B2top"],
+                    kwargs["B0"],
+                    kwargs["B1"],
+                    kwargs["PF1"],
+                    kwargs["NmF1"],
+                    kwargs["NmE"],
+                    kwargs["hmE"],
+                    modip,
+                    doy,
+                    hour,
+                    kwargs["NmD"],
+                    kwargs["Nmpt"],
+                    kwargs["Hpt"],
+                    kwargs["Nmpl"],
+                    kwargs["Hpl"],
+                )
             else:
                 raise NotImplementedError("not implemented")
         else:
@@ -1077,6 +1165,34 @@ class AIDAState(object):
                 Ne = self._calcNe_NeQuick(**kwargs)
             elif self.Parameterization == "AIDA":
                 Ne = self._calcNe_AIDA(**kwargs)
+            elif self.Parameterization == "IRI":
+                hour, doy = self._IRI_time(kwargs["glon"])
+                if "modip" not in kwargs:
+                    modip = self.Modip.interp(kwargs["glat"], kwargs["glon"])
+                else:
+                    modip = kwargs["modip"]
+                Ne = IRI_fun(
+                    kwargs["glat"],
+                    kwargs["glon"],
+                    kwargs["alt"],
+                    kwargs["NmF2"],
+                    kwargs["hmF2"],
+                    kwargs["B2top"],
+                    kwargs["B0"],
+                    kwargs["B1"],
+                    kwargs["PF1"],
+                    kwargs["NmF1"],
+                    kwargs["NmE"],
+                    kwargs["hmE"],
+                    modip,
+                    doy,
+                    hour,
+                    kwargs["NmD"],
+                    kwargs["Nmpt"],
+                    kwargs["Hpt"],
+                    kwargs["Nmpl"],
+                    kwargs["Hpl"],
+                )
             else:
                 raise NotImplementedError("not implemented")
 
@@ -1133,11 +1249,6 @@ class AIDAState(object):
         return self._calcValueBasis(
             Basis, MBasis, charList=charList, particleIndex=particleIndex
         )
-
-        # for Value in self._calcValueBasis(
-        #    Basis, MBasis, charList=charList, particleIndex=particleIndex
-        # ):
-        #    yield Value
 
     ###########################################################################
 
@@ -1545,6 +1656,15 @@ class AIDAState(object):
         )
 
         return Config
+
+    def _IRI_time(self, lon: float):
+        time = epoch2dt(self.Time)
+        hour = np.mod((lon / 15 + time.hour + time.minute / 60), 24.0)
+
+        doy = (
+            dt.datetime(time.year, time.month, time.day) - dt.datetime(time.year, 1, 1)
+        ).days + 1
+        return hour, doy
 
 
 ###############################################################################
