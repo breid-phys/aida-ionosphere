@@ -14,6 +14,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import xarray
+import typing
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
 from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics, _Nm2sNm
@@ -307,7 +308,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def readFile(self, inputFile: str | Path) -> None:
+    def readFile(self, inputFile: typing.Union[str , Path]) -> None:
         """
 
         Reads HDF5 file
@@ -397,7 +398,7 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def saveFile(self, outputFile: str | Path, is_output: bool = False):
+    def saveFile(self, outputFile: typing.Union[str , Path], is_output: bool = False):
         """
 
         Saves state to HDF5 file
