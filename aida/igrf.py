@@ -354,7 +354,7 @@ def synth_values(coeffs, radius, theta, phi, nmax=None, nmin=1, grid=False):
     radius = np.array(radius, dtype=float) / 6371.2  # Earth's average radius
     theta = np.array(theta, dtype=float)
     phi = np.array(phi, dtype=float)
-    if (np.amin(theta) < 0.0) | (np.amax(theta) > 180.0):
+    if (np.amin(theta) < 0.0) or (np.amax(theta) > 180.0):
         raise ValueError("Colatitude outside bounds [0, 180].")
 
     if nmin < 1:
