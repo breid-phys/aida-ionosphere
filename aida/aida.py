@@ -317,7 +317,8 @@ class AIDAState(object):
         inputFile = Path(inputFile)
 
         if not inputFile.exists():
-            raise (FileNotFoundError(f" Input file {inputFile.expanduser()} not found"))
+            raise (FileNotFoundError(
+                f" Input file {inputFile.expanduser()} not found"))
             return
 
         with h5py.File(inputFile, "r") as openFile:
@@ -348,9 +349,11 @@ class AIDAState(object):
 
                 if "Parameters/" + Char not in openFile:
                     if self._strict_config:
-                        raise ValueError(f" parameter {Char} missing from input file.")
+                        raise ValueError(
+                            f" parameter {Char} missing from input file.")
                     else:
-                        logger.error(f" parameter {Char} missing from input file.")
+                        logger.error(
+                            f" parameter {Char} missing from input file.")
 
                 for attr in [key for key in dir(Parameter()) if key[0] != "_"]:
                     if f"Parameters/{Char}/{attr}" in openFile:
@@ -426,14 +429,16 @@ class AIDAState(object):
                         key, data=str(self.Metadata[key])
                     )
                 else:
-                    tmp_data = metaGroup.create_dataset(key, data=self.Metadata[key])
+                    tmp_data = metaGroup.create_dataset(
+                        key, data=self.Metadata[key])
 
             # filter info, if exists
             if bool(self.Filter):
                 filterGroup = dataFile.create_group("Filter")
 
                 for key in self.Filter.keys():
-                    tmp_data = filterGroup.create_dataset(key, data=self.Filter[key])
+                    tmp_data = filterGroup.create_dataset(
+                        key, data=self.Filter[key])
 
             # parameters
             paramGroup = dataFile.create_group("Parameters")
@@ -465,7 +470,8 @@ class AIDAState(object):
                             compression_opts=1,
                         )
                     else:
-                        tmp_data = charGroup.create_dataset(tAttr, data=tmp_data)
+                        tmp_data = charGroup.create_dataset(
+                            tAttr, data=tmp_data)
 
         return
 
@@ -487,7 +493,8 @@ class AIDAState(object):
             P.numParticles = 1
             if P.ptype == "active":
                 P.ptype = "static"
-            if P.bkgparameters is not None and not np.all(np.isnan(P.bkgparameters)):
+            if P.bkgparameters is not None and not np.all(
+                    np.isnan(P.bkgparameters)):
                 P.parameters = P.bkgparameters
             else:
                 allCharsHaveBkg = False
@@ -591,7 +598,8 @@ class AIDAState(object):
 
         maxParticles = self.maxParticles()
 
-        Values, Size = self._calc(lat, lon, alt, grid, particleIndex, TEC, MUF3000)
+        Values, Size = self._calc(
+            lat, lon, alt, grid, particleIndex, TEC, MUF3000)
 
         coords = Values.pop("coords")
 
@@ -613,7 +621,10 @@ class AIDAState(object):
 
         Output = xarray.Dataset(
             coords=coords,
-            data_vars={key: (ValueSize[key], Values[key]) for key in ValueSize},
+            data_vars={
+                key: (
+                    ValueSize[key],
+                    Values[key]) for key in ValueSize},
         )
 
         Output["glat"].attrs = {
@@ -626,10 +637,13 @@ class AIDAState(object):
         }
 
         if "alt" in Output.coords:
-            Output["alt"].attrs = {"units": "km", "description": "geodetic altitude"}
+            Output["alt"].attrs = {
+                "units": "km", "description": "geodetic altitude"}
 
         if "Ne" in Output:
-            Output["Ne"].attrs = {"units": "m-3", "description": "electron density"}
+            Output["Ne"].attrs = {
+                "units": "m-3",
+                "description": "electron density"}
 
         if "TEC" in Output:
             Output["TEC"].attrs = {
@@ -718,15 +732,20 @@ class AIDAState(object):
                 # some output files do not have correct weights
                 Output["Weight"] = (("particle",), np.atleast_1d(1.0))
             else:
-                Output["Weight"] = (("particle",), np.atleast_1d(self.Filter["Weight"]))
+                Output["Weight"] = (
+                    ("particle",), np.atleast_1d(
+                        self.Filter["Weight"]))
 
-            Output["Weight"].attrs = {"units": "", "description": "unnormalized weight"}
+            Output["Weight"].attrs = {
+                "units": "", "description": "unnormalized weight"}
 
         Output = Output.transpose(*Size["3D"], missing_dims="ignore").drop_vars(
             ["sNmF1", "sNmE"], errors="ignore"
         )
 
-        if collapse_particles and (maxParticles == 1 or len(Output["particle"]) == 1):
+        if collapse_particles and (
+            maxParticles == 1 or len(
+                Output["particle"]) == 1):
             Output = Output.squeeze(dim="particle")
 
         if as_dict:
@@ -770,12 +789,13 @@ class AIDAState(object):
         Output = {}
         if grid == "1D" and np.all(np.isnan(alt)):
             if lon.shape != lat.shape:
-                raise (ValueError(f"***{grid} grid: lat and lon must be same shape*"))
+                raise (
+                    ValueError(f"***{grid} grid: lat and lon must be same shape*"))
 
             glat = lat
             glon = lon
 
-            crd = ["x", "y", "z"][0 : np.ndim(glat)]
+            crd = ["x", "y", "z"][0: np.ndim(glat)]
 
             Output["coords"] = {"glat": (crd, glat), "glon": (crd, glon)}
 
@@ -793,13 +813,12 @@ class AIDAState(object):
                 or lat.shape != lon.shape
             ):
                 raise (
-                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*")
-                )
+                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*"))
 
             glat = lat
             glon = lon
 
-            crd = ["x", "y", "z"][0 : np.ndim(glat)]
+            crd = ["x", "y", "z"][0: np.ndim(glat)]
 
             Output["coords"] = {
                 "glat": (crd, glat),
@@ -816,13 +835,19 @@ class AIDAState(object):
 
         if grid == "2D":
             if lat.shape != lon.shape:
-                raise (ValueError(f"{grid} grid:" " lat and lon must be same shape"))
+                raise (
+                    ValueError(
+                        f"{grid} grid:"
+                        " lat and lon must be same shape"))
             glat = lat
             glon = lon
 
-            crd = ["x", "y"][0 : np.ndim(glat)]
+            crd = ["x", "y"][0: np.ndim(glat)]
 
-            Output["coords"] = {"glat": (crd, glat), "glon": (crd, glon), "alt": alt}
+            Output["coords"] = {
+                "glat": (
+                    crd, glat), "glon": (
+                    crd, glon), "alt": alt}
 
             Size = {
                 "3D": ("particle",) + tuple(crd) + ("alt",),
@@ -833,7 +858,10 @@ class AIDAState(object):
 
         if grid == "3D":
             if np.ndim(lat) > 1 or np.ndim(lon) > 1 or np.ndim(alt) > 1:
-                raise (ValueError(f"{grid} grid:" " lat, lon, and alt must be 1D"))
+                raise (
+                    ValueError(
+                        f"{grid} grid:"
+                        " lat, lon, and alt must be 1D"))
             glat, glon = np.meshgrid(lat, lon)
 
             Output["coords"] = {"glat": lat, "glon": lon, "alt": alt}
@@ -859,12 +887,16 @@ class AIDAState(object):
 
             if grid == "1D":
                 talt = np.reshape(alt, (1, alt.size))
-                tOutput = {Char: np.atleast_2d(Output[Char]) for Char in self.CharNames}
+                tOutput = {
+                    Char: np.atleast_2d(
+                        Output[Char]) for Char in self.CharNames}
                 tglat = np.atleast_2d(glat.ravel())
                 tglon = np.atleast_2d(glon.ravel())
             else:
                 talt = np.reshape(alt, (1, 1, alt.size))
-                tOutput = {Char: np.atleast_3d(Output[Char]) for Char in self.CharNames}
+                tOutput = {
+                    Char: np.atleast_3d(
+                        Output[Char]) for Char in self.CharNames}
                 tglat = np.atleast_3d(glat.ravel())
                 tglon = np.atleast_3d(glon.ravel())
 
@@ -887,7 +919,9 @@ class AIDAState(object):
                 )
             )
             tecAlt = np.reshape(tecAlt, (1, 1, tecAlt.size))
-            tOutput = {Char: np.atleast_3d(Output[Char]) for Char in self.CharNames}
+            tOutput = {
+                Char: np.atleast_3d(
+                    Output[Char]) for Char in self.CharNames}
             tglat = np.atleast_3d(glat.ravel())
             tglon = np.atleast_3d(glon.ravel())
 
@@ -917,9 +951,18 @@ class AIDAState(object):
             NmF1 = Output["NmF1"] * 1e11
             NmE = np.fmax(Output["NmE"] * 1e11, NmE_min())
         else:
-            # calculated separately so that bottomside effects can occur (B2bot)
-            NmF1 = self._calcNe(glat=glat, glon=glon, alt=Output["hmF1"], **Output)
-            NmE = self._calcNe(glat=glat, glon=glon, alt=Output["hmE"], **Output)
+            # calculated separately so that bottomside effects can occur
+            # (B2bot)
+            NmF1 = self._calcNe(
+                glat=glat,
+                glon=glon,
+                alt=Output["hmF1"],
+                **Output)
+            NmE = self._calcNe(
+                glat=glat,
+                glon=glon,
+                alt=Output["hmE"],
+                **Output)
 
         chi, cchi = self.solzen(glat, glon)
         NmF1 = np.where(chi < 90.0, NmF1, np.nan)
@@ -960,7 +1003,8 @@ class AIDAState(object):
             Output["NmD"] = 1e11 * Output["NmD"]
 
         if MUF3000:
-            x = np.clip(Output["foF2"] / Output["foE"], 1.7, 1e6)
+            # needs to treat NaN as +inf
+            x = np.fmax(np.fmin(Output["foF2"] / Output["foE"], 1e6), 1.7)
 
             a = 1890 - 355 / (x - 1.4)
             b = (2.5 * x - 3) ** (-2.35) - 1.6
@@ -972,7 +1016,14 @@ class AIDAState(object):
 
     ###########################################################################
 
-    def calcNe(self, lat, lon, alt, grid="1D", particleIndex=None, stec: bool = False):
+    def calcNe(
+            self,
+            lat,
+            lon,
+            alt,
+            grid="1D",
+            particleIndex=None,
+            stec: bool = False):
         """
         Calculates electron density for a given lat, lon, alt
 
@@ -1020,8 +1071,7 @@ class AIDAState(object):
                 or lat.shape != lon.shape
             ):
                 raise (
-                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*")
-                )
+                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*"))
 
             lat = lat.flatten()
             lon = lon.flatten()
@@ -1029,7 +1079,8 @@ class AIDAState(object):
 
         if grid == "2D":
             if lat.shape != lon.shape:
-                raise (ValueError(f"***{grid} grid: lat and lon must be same shape***"))
+                raise (
+                    ValueError(f"***{grid} grid: lat and lon must be same shape***"))
 
         if grid == "3D":
             lat, lon = np.meshgrid(lat, lon)
@@ -1045,7 +1096,12 @@ class AIDAState(object):
             Chars = self._calcValueIterator(
                 lat.ravel(), lon.ravel(), particleIndex=particleIndex
             )
-            Ne = self._calcNe(glat=lat, glon=lon, alt=alt, **dict(Chars), stec=stec)
+            Ne = self._calcNe(
+                glat=lat,
+                glon=lon,
+                alt=alt,
+                **dict(Chars),
+                stec=stec)
 
         else:
             alt = np.reshape(alt, (1, 1, alt.size))
@@ -1063,14 +1119,18 @@ class AIDAState(object):
                 stec=stec,
             )
         if grid == "3D":  # reshape array to get 3d output
-            Ne = np.reshape(Ne, (Ne.shape[0], lon.shape[1], lon.shape[0], Ne.shape[2]))
+            Ne = np.reshape(
+                Ne, (Ne.shape[0], lon.shape[1], lon.shape[0], Ne.shape[2]))
 
         np.seterr(**oldsettings)
         # rescale Ne
         return Ne
 
     def _calcNe(self, **kwargs):
-        arg_is_xarray = [isinstance(kwargs[key], xarray.DataArray) for key in kwargs]
+        arg_is_xarray = [
+            isinstance(
+                kwargs[key],
+                xarray.DataArray) for key in kwargs]
 
         if "stec" in kwargs and kwargs["stec"]:
             IRI_fun = Ne_IRI_stec
@@ -1258,23 +1318,47 @@ class AIDAState(object):
         if charList is None:
             charList = self.CharNames
         if ufunc is None:
-            return zip(charList, self.calcValue(lat, lon, charList, particleIndex))
+            return zip(
+                charList,
+                self.calcValue(
+                    lat,
+                    lon,
+                    charList,
+                    particleIndex))
         else:
             return zip(
                 charList,
-                (ufunc(i) for i in self.calcValue(lat, lon, charList, particleIndex)),
+                (ufunc(i) for i in self.calcValue(
+                    lat,
+                    lon,
+                    charList,
+                    particleIndex)),
             )
 
-    def _calcValueBasisIterator(self, Basis, MBasis, charList=None, particleIndex=None):
+    def _calcValueBasisIterator(
+            self,
+            Basis,
+            MBasis,
+            charList=None,
+            particleIndex=None):
         if charList is None:
             charList = self.CharNames
         return zip(
-            charList, self._calcValueBasis(Basis, MBasis, charList, particleIndex)
-        )
+            charList,
+            self._calcValueBasis(
+                Basis,
+                MBasis,
+                charList,
+                particleIndex))
 
     ###########################################################################
 
-    def _calcValueBasis(self, Basis, MBasis, charList=None, particleIndex=None):
+    def _calcValueBasis(
+            self,
+            Basis,
+            MBasis,
+            charList=None,
+            particleIndex=None):
         """
         Calculates parameters for given basis set
 
@@ -1316,10 +1400,10 @@ class AIDAState(object):
             P = getattr(self, Char)
 
             if P.coords == "geo":
-                B = Basis[0 : P.numDim, :]
+                B = Basis[0: P.numDim, :]
 
             if P.coords == "modip":
-                B = MBasis[0 : P.numDim, :]
+                B = MBasis[0: P.numDim, :]
 
             if P.ptype == "constant":
                 B = np.array(B[0, :], ndmin=2)
@@ -1331,14 +1415,16 @@ class AIDAState(object):
                 elif P.scale == "log":
                     Value = np.exp(P.parameters @ B)
                 else:
-                    raise (ValueError(f"Unrecognized parameter scale {P.scale}"))
+                    raise (
+                        ValueError(f"Unrecognized parameter scale {P.scale}"))
             else:
                 if P.scale == "abs":
                     Value = P.parameters[particleIndex, :] @ B
                 elif P.scale == "log":
                     Value = np.exp(P.parameters[particleIndex, :] @ B)
                 else:
-                    raise (ValueError(f"Unrecognized parameter scale {P.scale}"))
+                    raise (
+                        ValueError(f"Unrecognized parameter scale {P.scale}"))
 
             if "snm" in P.name.lower():
                 # sNmF1 and sNmE
@@ -1417,7 +1503,9 @@ class AIDAState(object):
             W = np.ones(ModelState.maxParticles())
 
         if np.any(np.isnan(W)):
-            logger.warning(f" {Version}: " "NaN detected in incoming model weights")
+            logger.warning(
+                f" {Version}: "
+                "NaN detected in incoming model weights")
             W = np.ones(W.shape)
             W = W / np.sum(W)
 
@@ -1533,7 +1621,17 @@ class AIDAState(object):
         chi0 = 86.23292796211615
 
         # NeQuick 2 and G pg 71
-        return djoin(90.0 - 0.24 * np.exp(20.0 - 0.2 * chi), chi, 12.0, chi - chi0)
+        return djoin(
+            90.0
+            - 0.24
+            * np.exp(
+                20.0
+                - 0.2
+                * chi),
+            chi,
+            12.0,
+            chi
+            - chi0)
 
     ##########################################################################
 
@@ -1661,9 +1759,8 @@ class AIDAState(object):
         time = epoch2dt(self.Time)
         hour = np.mod((lon / 15 + time.hour + time.minute / 60), 24.0)
 
-        doy = (
-            dt.datetime(time.year, time.month, time.day) - dt.datetime(time.year, 1, 1)
-        ).days + 1
+        doy = (dt.datetime(time.year, time.month, time.day)
+               - dt.datetime(time.year, 1, 1)).days + 1
         return hour, doy
 
 
