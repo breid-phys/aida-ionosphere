@@ -14,6 +14,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import xarray
+from scipy.integrate import cumulative_trapezoid
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
 from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics, _Nm2sNm
@@ -650,6 +651,10 @@ class AIDAState(object):
                 "units": "TECU",
                 "description": "Total Electron Content to 20 000 km",
             }
+            Output["h_shell"].attrs = {
+                "units": "km",
+                "description": "ionospheric shell height",
+            }
 
         if "MUF3000" in Output:
             Output["MUF3000"].attrs = {
@@ -681,10 +686,8 @@ class AIDAState(object):
                 }
             elif "hm" in Char:
                 Output[Char] = np.fmax(Output[Char], 0.0)
-                CharAttributes = {
-                    "units": "km",
-                    "description": f"altitude of the {Char[2:]} layer peak density",
-                }
+                CharAttributes = {"units": "km", "description": f"altitude of the {
+                    Char[2:]} layer peak density", }
             elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
@@ -790,7 +793,8 @@ class AIDAState(object):
         if grid == "1D" and np.all(np.isnan(alt)):
             if lon.shape != lat.shape:
                 raise (
-                    ValueError(f"***{grid} grid: lat and lon must be same shape*"))
+                    ValueError(
+                        f"***{grid} grid: lat and lon must be same shape*"))
 
             glat = lat
             glon = lon
@@ -813,7 +817,8 @@ class AIDAState(object):
                 or lat.shape != lon.shape
             ):
                 raise (
-                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*"))
+                    ValueError(
+                        f"***{grid} grid: lat, lon, and alt must be same shape*"))
 
             glat = lat
             glon = lon
@@ -913,8 +918,8 @@ class AIDAState(object):
         if TEC:
             tecAlt = np.hstack(
                 (
-                    np.arange(70.0, 450.0, 5.0),
-                    np.arange(450.0, 2000.0, 25.0),
+                    np.arange(70.0, 650.0, 5.0),
+                    np.arange(650.0, 2000.0, 25.0),
                     np.arange(2000.0, 20000.0, 200.0),
                 )
             )
@@ -927,9 +932,12 @@ class AIDAState(object):
 
             # tecAlt = xarray.DataArray(tecAlt, coords={"alt": tecAlt})
             M = self._calcNe(glat=tglat, glon=tglon, alt=tecAlt, **tOutput)
+            cTEC = cumulative_trapezoid(M, x=tecAlt)
             Output["TEC"] = np.reshape(
-                np.trapz(M, x=tecAlt) * 1e3 / 1e16, Size["2DShape"]
+                cTEC[..., -1] * 1e3 / 1e16, Size["2DShape"]
             )
+            Output['h_shell'] = np.reshape(tecAlt.ravel()[np.argmin(
+                np.abs(cTEC / np.atleast_3d(cTEC[..., -1]) - 0.5), axis=2)], Size["2DShape"])
 
         for Char in self.CharNames:
             Param = getattr(self, Char)
@@ -988,6 +996,7 @@ class AIDAState(object):
             mask_NmE = np.ones_like(Output["NmE"])
 
         Output["NmF1"] = np.where(mask_NmF1 > 0.0, NmF1, np.nan)
+        Output["hmF1"] = np.where(mask_NmF1 > 0.0, Output['hmF1'], np.nan)
         Output["NmE"] = np.where(mask_NmE > 0.0, NmE, np.nan)
 
         Output["foE"] = np.sqrt(Output["NmE"] / 0.124e11)
@@ -1071,7 +1080,8 @@ class AIDAState(object):
                 or lat.shape != lon.shape
             ):
                 raise (
-                    ValueError(f"***{grid} grid: lat, lon, and alt must be same shape*"))
+                    ValueError(
+                        f"***{grid} grid: lat, lon, and alt must be same shape*"))
 
             lat = lat.flatten()
             lon = lon.flatten()
@@ -1080,7 +1090,8 @@ class AIDAState(object):
         if grid == "2D":
             if lat.shape != lon.shape:
                 raise (
-                    ValueError(f"***{grid} grid: lat and lon must be same shape***"))
+                    ValueError(
+                        f"***{grid} grid: lat and lon must be same shape***"))
 
         if grid == "3D":
             lat, lon = np.meshgrid(lat, lon)
@@ -1524,8 +1535,8 @@ class AIDAState(object):
             ri = use_i
             if N is not None and ri.size != N:
                 raise ValueError(
-                    f" requested size {N} and provided index of size {ri.size} do not match"
-                )
+                    f" requested size {N} and provided index of size {
+                        ri.size} do not match")
 
         W = (1.0 / N) * np.ones(N)
         ModelState.Filter["Weight"] = W
