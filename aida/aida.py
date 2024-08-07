@@ -686,8 +686,8 @@ class AIDAState(object):
                 }
             elif "hm" in Char:
                 Output[Char] = np.fmax(Output[Char], 0.0)
-                CharAttributes = {"units": "km", "description": f"altitude of the {
-                    Char[2:]} layer peak density", }
+                CharAttributes = {"units": "km", 
+                                  "description": f"altitude of the {Char[2:]} layer peak density", }
             elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
@@ -972,12 +972,9 @@ class AIDAState(object):
                 alt=Output["hmE"],
                 **Output)
 
-        chi, cchi = self.solzen(glat, glon)
-        NmF1 = np.where(chi < 90.0, NmF1, np.nan)
-
         if self.Parameterization == "NeQuick":
             mask_NmF1 = Output["sNmF1"]
-            mask_NmE = Output["sNmE"]
+            mask_NmE = np.ones_like(Output["sNmE"])
         elif self.Parameterization == "AIDA":
             mask_NmF1, mask_NmE = _Nm2sNm(
                 Output["NmF2"],
@@ -990,10 +987,14 @@ class AIDAState(object):
                 Output["hmE"],
                 Output["Betop"],
             )
+            mask_NmE = np.ones_like(mask_NmE)
         elif self.Parameterization == "IRI":
             # only used for NmF1 masking
             mask_NmF1 = Output["PF1"] - 0.5
             mask_NmE = np.ones_like(Output["NmE"])
+
+        chi, cchi = self.solzen(glat, glon)
+        mask_NmF1 = np.where(chi < 90.0, mask_NmF1, 0.0)
 
         Output["NmF1"] = np.where(mask_NmF1 > 0.0, NmF1, np.nan)
         Output["hmF1"] = np.where(mask_NmF1 > 0.0, Output['hmF1'], np.nan)
@@ -1535,8 +1536,7 @@ class AIDAState(object):
             ri = use_i
             if N is not None and ri.size != N:
                 raise ValueError(
-                    f" requested size {N} and provided index of size {
-                        ri.size} do not match")
+                    f" requested size {N} and provided index of size {ri.size} do not match")
 
         W = (1.0 / N) * np.ones(N)
         ModelState.Filter["Weight"] = W
