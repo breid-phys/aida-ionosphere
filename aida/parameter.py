@@ -87,6 +87,11 @@ class Parameter(object):
         self.bkgvelocity = None
         self.temperature = None
         self.acceleration = None
+        self.kx = None
+        self.kv = None
+        self.kT = None
+        self.k_umin = None
+        self.k_uk = None
 
         for key in kwargs:
             if key in dir(self):
@@ -108,6 +113,21 @@ class Parameter(object):
 
         if self.coords is None:
             self.coords = "modip"
+
+        if self.kx is None:
+            self.kx = 0.95
+
+        if self.kv is None:
+            self.kv = 0.7
+
+        if self.kT is None:
+            self.kT = 0.95
+
+        if self.k_umin is None:
+            self.k_umin = 2.0
+
+        if self.k_uk is None:
+            self.k_uk = 0.5e-4
 
         # Check inputs
         chkFlag = self.__inputCheck__()
@@ -307,6 +327,91 @@ class Parameter(object):
             self._temperature = None
         else:
             self._temperature = np.array(value, dtype=float, ndmin=2)
+
+    ######################################################
+
+    @property
+    def kx(self):
+        return self._kx
+
+    @kx.setter
+    def kx(self, value):
+        if value is None:
+            pass
+        else:
+            if not isinstance(value, float):
+                value = float(value)
+
+            value = np.clip(value, 0.0, 1.0).ravel()
+        self._kx = value
+
+    ######################################################
+
+    @property
+    def kv(self):
+        return self._kv
+
+    @kv.setter
+    def kv(self, value):
+        if value is None:
+            pass
+        else:
+            if not isinstance(value, float):
+                value = float(value)
+
+            value = np.clip(value, 0.0, 1.0).ravel()
+        self._kv = value
+
+        ######################################################
+
+    @property
+    def kT(self):
+        return self._kT
+
+    @kT.setter
+    def kT(self, value):
+        if value is None:
+            pass
+        else:
+            if not isinstance(value, float):
+                value = float(value)
+
+            value = np.clip(value, 0.0, 1.0).ravel()
+        self._kT = value
+
+    ######################################################
+
+    @property
+    def k_umin(self):
+        return self._k_umin
+
+    @k_umin.setter
+    def k_umin(self, value):
+        if value is None:
+            pass
+        else:
+            if not isinstance(value, float):
+                value = float(value)
+
+            value = np.fmax(value, 0.0).ravel()
+        self._k_umin = value
+
+    ######################################################
+
+    @property
+    def k_uk(self):
+        return self._k_uk
+
+    @k_uk.setter
+    def k_uk(self, value):
+        if value is None:
+            pass
+        else:
+            if not isinstance(value, float):
+                value = float(value)
+
+            value = np.fmax(value, 0.0).ravel()
+        self._k_uk = value
 
     ######################################################
 
