@@ -7,11 +7,11 @@ Created on Wed Mar 30 13:51:32 2022
 """
 from __future__ import annotations
 
-import os
 import h5py
 import numpy as np
 import scipy.interpolate as spInt
 from importlib import resources
+from pathlib import Path
 import datetime
 
 from .igrf import inclination, inc2modip
@@ -35,6 +35,7 @@ class Modip(object):
         """ """
 
         self.use_IGRF = use_IGRF
+        self.time = datetime.datetime(1, 1, 1)
 
         if InputFile is None:
             InputFile = (
@@ -44,17 +45,21 @@ class Modip(object):
                 .expanduser()
             )
 
-        if os.path.exists(os.path.join(InputFile)):
-            fileLoc = os.path.join(InputFile)
-            openFile = h5py.File(fileLoc, "r")
-            latModip = openFile["MODIP/latitude"][()]
-            lonModip = openFile["MODIP/longitude"][()]
-            modip = openFile["MODIP/modip"][()]
-            openFile.close()
+        InputFile = Path(InputFile)
+        if InputFile.exists():
+            with h5py.File(InputFile, "r") as openFile:
+                latModip = openFile["MODIP/latitude"][()]
+                lonModip = openFile["MODIP/longitude"][()]
+                modip = openFile["MODIP/modip"][()]
         else:
             FileNotFoundError(InputFile)
 
+        self.file = InputFile.name
+
         if self.use_IGRF:
+            # keep track of time to avoid needless recalculating
+            self.time = datetime.datetime(igrf_time.year, igrf_time.month, igrf_time.day)
+
             date_decimal = (
                 float(igrf_time.year)
                 + float(igrf_time.month - 1) / 12.0
@@ -65,6 +70,11 @@ class Modip(object):
             glon, glat = np.meshgrid(glon, glat)
             inc = inclination(date_decimal, glon, glat)
             modip = inc2modip(inc, glat)
+
+        # used to update NeQuick
+        self.modip = modip
+        self.lat = latModip
+        self.lon = lonModip
 
         self.Interpolant = spInt.RectBivariateSpline(
             latModip, lonModip, modip, kx=3, ky=3

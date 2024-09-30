@@ -203,12 +203,13 @@ class AIDAState(object):
 
         """
         self._strict_config = strict_config
-        self.Time = 0.0
+        self._Time = 0.0  # set inner value to avoid Modip calculation
         self.Version = "0.0"
-        self.Metadata = {}
+        self.Metadata = {"Modip": "IGRF"}
         self.Filter = {}
 
-        self.Modip = Modip(ModipFile)
+        # set use_IGRF to False for now to save CPU
+        self.Modip = Modip(ModipFile, use_IGRF=False)
 
         self.Parameterization = Parameterization
 
@@ -292,6 +293,12 @@ class AIDAState(object):
             raise TypeError("Invalid type for State.Time: {type(value)}")
 
         time = epoch2dt(self._Time)
+        # set up modip
+        if "Modip" in self.Metadata and self.Metadata['Modip'] == "IGRF":
+            # check if we need to update modip
+            if dt.datetime(time.year, time.month, time.day) != self.Modip.time:
+                self.Modip = Modip(None, use_IGRF=True, igrf_time=time)
+
         UT = time.hour + time.minute / 60.0
 
         doy = time.month * 30.5 - 15.0
@@ -397,6 +404,18 @@ class AIDAState(object):
                         fdata = fdata.decode("utf8")
                     self.Filter[key] = fdata
 
+            # set up modip
+            if "Modip" not in self.Metadata:
+                # old files used static modip
+                self.Modip = Modip(None, use_IGRF=False)
+                self.Metadata['Modip'] = self.Modip.file
+            else:
+                # check if we need to update modip
+                new_time = epoch2dt(self.Time)
+                if dt.datetime(new_time.year, new_time.month, new_time.day) != self.Modip.time:
+                    self.Modip = Modip(None, use_IGRF=True, igrf_time=new_time)
+                    self.Metadata['Modip'] = "IGRF"
+
         return
 
     ###########################################################################
@@ -457,7 +476,9 @@ class AIDAState(object):
                     if tmp_data is None:
                         continue
 
-                    if is_output and tAttr not in dP._output:
+                    if (is_output
+                            and (tAttr in (dP._statesized + dP._bkgsized))
+                            and (tAttr not in dP._output)):
                         # only save necessary fields for output files
                         continue
 
@@ -686,8 +707,8 @@ class AIDAState(object):
                 }
             elif "hm" in Char:
                 Output[Char] = np.fmax(Output[Char], 0.0)
-                CharAttributes = {"units": "km", 
-                                  "description": f"altitude of the {Char[2:]} layer peak density", }
+                CharAttributes = {"units": "km",
+                                  "description": f"altitude of the {Char[2:]} layer peak density"}
             elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
@@ -990,7 +1011,7 @@ class AIDAState(object):
             mask_NmE = np.ones_like(mask_NmE)
         elif self.Parameterization == "IRI":
             # only used for NmF1 masking
-            mask_NmF1 = Output["PF1"] - 0.5
+            mask_NmF1 = Output["PF1"] - 0.3  # more accurate to cut at 0.3
             mask_NmE = np.ones_like(Output["NmE"])
 
         chi, cchi = self.solzen(glat, glon)
