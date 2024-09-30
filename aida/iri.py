@@ -1108,7 +1108,7 @@ def _Ne_IRI(
     if alt > hmE:
         # bottomside
 
-        if PF1 > 0.5 and 0.9 * NmF1 >= NmE:
+        if PF1 > 0.3 and 0.9 * NmF1 >= NmE:
             # F1 layer present
             hmF1 = _newton_hmF1(NmF2, hmF2, B0, B1, NmF1, NmE, hmE)
             if alt > hmF1 and hmF1 > 0.0:
@@ -1127,6 +1127,7 @@ def _Ne_IRI(
 
             # supposed to be SAX/SUX 200, but difference is marginal
             C1 = _C1(modip, hour, sax110, sux110)
+            C1 = C1 * _eps_0(PF1, 0.01, 0.37)  # smooth out F1 transition
             hst = _newton_hst_F1(NmF2, hmF2, B0, B1, hmF1, C1, NmE)
         else:
             hst = _newton_hst(NmF2, hmF2, B0, B1, NmE)
@@ -1304,7 +1305,7 @@ def _Ne_IRI_stec(
     if alt > hmE:
         # bottomside
 
-        if PF1 > 0.5 and 0.9 * NmF1 >= NmE:
+        if PF1 > 0.3 and 0.9 * NmF1 >= NmE:
             # F1 layer present
             A = NmF1 / NmF2
 
@@ -1322,6 +1323,7 @@ def _Ne_IRI_stec(
             decl, zenith, sax200, sux200 = _soco(doy, hour, glat, glon, 200.0)
 
             C1 = _C1(modip, hour, sax200, sux200)
+            C1 = C1 * _eps_0(PF1, 0.01, 0.37)  # smooth out F1 transition
 
             A = NmE / NmF2
 
