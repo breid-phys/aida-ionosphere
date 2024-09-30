@@ -11,7 +11,6 @@ import h5py
 import numpy as np
 import scipy.interpolate as spInt
 from importlib import resources
-from pathlib import Path
 import datetime
 
 from .igrf import inclination, inc2modip
@@ -57,9 +56,9 @@ class Modip(object):
             self.time = datetime.datetime(igrf_time.year, igrf_time.month, igrf_time.day)
 
             date_decimal = (
-                float(igrf_time.year)
-                + float(igrf_time.month - 1) / 12.0
-                + float(igrf_time.day - 1) / 365.0
+                igrf_time.year
+                + (igrf_time.month - 1) / 12.0
+                + (igrf_time.day - 1) / 365.0
             )
             glon = np.mod(lonModip + 180.0, 360.0) - 180.0
             glat = np.sign(latModip) * np.abs(np.mod(latModip + 90.0, 180.0) - 90.0)
