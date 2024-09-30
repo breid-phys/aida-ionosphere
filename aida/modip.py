@@ -45,14 +45,10 @@ class Modip(object):
                 .expanduser()
             )
 
-        InputFile = Path(InputFile)
-        if InputFile.exists():
-            with h5py.File(InputFile, "r") as openFile:
-                latModip = openFile["MODIP/latitude"][()]
-                lonModip = openFile["MODIP/longitude"][()]
-                modip = openFile["MODIP/modip"][()]
-        else:
-            FileNotFoundError(InputFile)
+        with h5py.File(InputFile, "r") as openFile:
+            latModip = openFile["MODIP/latitude"][()]
+            lonModip = openFile["MODIP/longitude"][()]
+            modip = openFile["MODIP/modip"][()]
 
         self.file = InputFile.name
 
