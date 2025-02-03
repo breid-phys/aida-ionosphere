@@ -669,13 +669,13 @@ class AIDAState(object):
                     "description": "upper plasmasphere peak density",
                 }
             elif "Hpl" in Char:
-                Output[Char] = 1e11 * Output[Char]
+                Output[Char] = Output[Char]
                 CharAttributes = {
                     "units": "km",
                     "description": "lower plasmaphere scale thickness",
                 }
             elif "Hpt" in Char:
-                Output[Char] = 1e11 * Output[Char]
+                Output[Char] = Output[Char]
                 CharAttributes = {
                     "units": "km",
                     "description": "upper plasmasphere scale thickness",

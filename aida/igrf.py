@@ -83,8 +83,7 @@ def load_coeffs(date_decimal):
         resources.files("aida").joinpath("data").joinpath("IGRF14.shc").expanduser()
     )
 
-    with open(IGRF_FILE, mode="r") as fopen:
-        file_array = np.genfromtxt(fopen, delimiter="", skip_header=5)
+    file_array = np.genfromtxt(IGRF_FILE, delimiter="", skip_header=5)
 
     # create the time array of years that match the years in the file
     # (check if file is change to the newer version)
