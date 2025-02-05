@@ -17,7 +17,7 @@ import xarray
 from scipy.integrate import cumulative_trapezoid
 
 from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
-from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics, _Nm2sNm
+from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics
 from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
@@ -412,7 +412,10 @@ class AIDAState(object):
             else:
                 # check if we need to update modip
                 new_time = epoch2dt(self.Time)
-                if dt.datetime(new_time.year, new_time.month, new_time.day) != self.Modip.time:
+                if dt.datetime(
+                        new_time.year,
+                        new_time.month,
+                        new_time.day) != self.Modip.time:
                     self.Modip = Modip(None, use_IGRF=True, igrf_time=new_time)
                     self.Metadata['Modip'] = "IGRF"
 
@@ -649,6 +652,78 @@ class AIDAState(object):
                     Values[key]) for key in ValueSize},
         )
 
+        for Char in Output:
+
+            if Char in ["sNmF1", "sNmE"]:
+                continue
+            elif "Nmpl" in Char:
+                Output[Char] = 1e11 * Output[Char]
+                CharAttributes = {
+                    "units": "m-3",
+                    "description": "lower plasmaphere peak density",
+                }
+            elif "Nmpt" in Char:
+                Output[Char] = 1e11 * Output[Char]
+                CharAttributes = {
+                    "units": "m-3",
+                    "description": "upper plasmasphere peak density",
+                }
+            elif "Hpl" in Char:
+                Output[Char] = Output[Char]
+                CharAttributes = {
+                    "units": "km",
+                    "description": "lower plasmaphere scale thickness",
+                }
+            elif "Hpt" in Char:
+                Output[Char] = Output[Char]
+                CharAttributes = {
+                    "units": "km",
+                    "description": "upper plasmasphere scale thickness",
+                }
+            elif "Nm" in Char:
+                Output[Char] = Output[Char]
+                CharAttributes = {
+                    "units": "m-3",
+                    "description": f"peak density of the {Char[2:]} layer",
+                }
+            elif "fo" in Char:
+                CharAttributes = {
+                    "units": "MHz",
+                    "description": f"critical frequency of the {Char[2:]} layer",
+                }
+            elif "hm" in Char:
+                Output[Char] = np.fmax(Output[Char], 0.0)
+                CharAttributes = {"units": "km", "description": f"altitude of the {
+                    Char[2:]} layer peak density"}
+            elif "B" == Char[0] and len(Char) > 2:
+                Output[Char] = np.fmax(Output[Char], 1.0)
+
+                if Char[1] == "e":
+                    Layer = "E"
+                else:
+                    Layer = f"F{Char[1]}"
+
+                CharAttributes = {
+                    "units": "km",
+                    "description": "thickness of the "
+                    f"{Char[-3:]} of the {Layer} layer",
+                }
+            elif "iB" == Char[:2]:
+                Output[Char[1:]] = np.fmax(1.0 / Output[Char], 1.0)
+
+                if Char[2] == "e":
+                    Layer = "E"
+                else:
+                    Layer = f"F{Char[2]}"
+
+                CharAttributes = {
+                    "units": "km",
+                    "description": "thickness of the "
+                    f"{Char[-4:]} of the {Layer} layer",
+                }
+
+            Output[Char].attrs = CharAttributes
+
         Output["glat"].attrs = {
             "units": "degrees N",
             "description": "geodetic latitude",
@@ -683,60 +758,6 @@ class AIDAState(object):
                 "description": "maximum useable frequency "
                 "of the F2 layer for 3000 km circuit",
             }
-
-        for Char in Output:
-
-            if Char in ["sNmF1", "sNmE"]:
-                continue
-            elif "Nmp" in Char:
-                Output[Char] = 1e11 * Output[Char]
-                CharAttributes = {
-                    "units": "m-3",
-                    "description": f"peak density of the {Char[2:]} layer",
-                }
-            elif "Nm" in Char:
-                Output[Char] = Output[Char]
-                CharAttributes = {
-                    "units": "m-3",
-                    "description": f"peak density of the {Char[2:]} layer",
-                }
-            elif "fo" in Char:
-                CharAttributes = {
-                    "units": "MHz",
-                    "description": f"critical frequency of the {Char[2:]} layer",
-                }
-            elif "hm" in Char:
-                Output[Char] = np.fmax(Output[Char], 0.0)
-                CharAttributes = {"units": "km",
-                                  "description": f"altitude of the {Char[2:]} layer peak density"}
-            elif "B" == Char[0] and len(Char) > 2:
-                Output[Char] = np.fmax(Output[Char], 1.0)
-
-                if Char[1] == "e":
-                    Layer = "E"
-                else:
-                    Layer = f"F{Char[1]}"
-
-                CharAttributes = {
-                    "units": "km",
-                    "description": "thickness of the "
-                    f"{Char[-3:]} of the {Layer} layer",
-                }
-            elif "iB" == Char[:2]:
-                Output[Char[1:]] = np.fmax(1.0 / Output[Char], 1.0)
-
-                if Char[2] == "e":
-                    Layer = "E"
-                else:
-                    Layer = f"F{Char[2]}"
-
-                CharAttributes = {
-                    "units": "km",
-                    "description": "thickness of the "
-                    f"{Char[-4:]} of the {Layer} layer",
-                }
-
-            Output[Char].attrs = CharAttributes
 
         Output.attrs["Epoch"] = self.Time
         Output.attrs["Time"] = epoch2npdt(self.Time).astype(str)
@@ -997,18 +1018,8 @@ class AIDAState(object):
             mask_NmF1 = Output["sNmF1"]
             mask_NmE = np.ones_like(Output["sNmE"])
         elif self.Parameterization == "AIDA":
-            mask_NmF1, mask_NmE = _Nm2sNm(
-                Output["NmF2"],
-                Output["hmF2"],
-                Output["B2bot"],
-                Output["NmF1"],
-                Output["hmF1"],
-                Output["B1bot"],
-                Output["NmE"],
-                Output["hmE"],
-                Output["Betop"],
-            )
-            mask_NmE = np.ones_like(mask_NmE)
+            mask_NmF1 = np.ones_like(Output["NmF1"])
+            mask_NmE = np.ones_like(Output["NmF1"])
         elif self.Parameterization == "IRI":
             # only used for NmF1 masking
             mask_NmF1 = Output["PF1"] - 0.3  # more accurate to cut at 0.3
@@ -1557,7 +1568,8 @@ class AIDAState(object):
             ri = use_i
             if N is not None and ri.size != N:
                 raise ValueError(
-                    f" requested size {N} and provided index of size {ri.size} do not match")
+                    f" requested size {N} and provided index of size {
+                        ri.size} do not match")
 
         W = (1.0 / N) * np.ones(N)
         ModelState.Filter["Weight"] = W

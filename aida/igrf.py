@@ -80,15 +80,14 @@ def load_coeffs(date_decimal):
     # open IGRF file and read to array the main table
 
     IGRF_FILE = (
-        resources.files("aida").joinpath("data").joinpath("IGRF13.shc").expanduser()
+        resources.files("aida").joinpath("data").joinpath("IGRF14.shc").expanduser()
     )
 
-    with open(IGRF_FILE, mode="r") as fopen:
-        file_array = np.genfromtxt(fopen, delimiter="", skip_header=5)
+    file_array = np.genfromtxt(IGRF_FILE, delimiter="", skip_header=5)
 
     # create the time array of years that match the years in the file
     # (check if file is change to the newer version)
-    igrf_time = np.arange(1900, 2025 + 5, 5)
+    igrf_time = np.arange(1900, 2030 + 5, 5)
 
     # exclude first 2 columns, these are the m & n indecies
     igrf_coeffs = file_array[:, 2:]
