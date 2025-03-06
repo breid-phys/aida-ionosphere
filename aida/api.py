@@ -11,7 +11,7 @@ logger = AIDAlogger(__name__)
 def api_config(filename):
     """Read a AIDA input file (in .ini format)
 
-    This function reads a (well-formmated) AIDA input file and adds all the
+    This function reads a (well-formatted) AIDA input file and adds all the
     parameters to a dictionary which is carried around and used by the model
 
     Parameters
