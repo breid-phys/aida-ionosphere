@@ -89,6 +89,13 @@ _Currently the AIDA interpreter must be installed using git. In the future the m
    python -m pip install -e /path/to/aida
    ```
 
+  (In Ubuntu, the openmpi dependency will require installation first)
+
+  ```sh
+  sudo apt install libopenmpi-dev
+   ```
+
+
 ### Installation (BlueBEAR)
 
 _The AIDA interpreter is already available on BlueBEAR through the `dasp` project virtual environment._
