@@ -89,11 +89,17 @@ _Currently the AIDA interpreter must be installed using git. In the future the m
    python -m pip install -e /path/to/aida
    ```
 
-  (In Ubuntu, the openmpi dependency will require installation first)
+  The openmpi dependency will require installation first:
 
+  On Ubuntu:
   ```sh
-  sudo apt install libopenmpi-dev
-   ```
+    sudo apt install libopenmpi-dev
+  ```
+
+  On Fedora:
+  ```sh
+    sudo dnf install openmpi-devel
+  ```
 
 
 ### Installation (BlueBEAR)
