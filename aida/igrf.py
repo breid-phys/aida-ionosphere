@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# this code is modified from the original version in the pyIRI project
+# https://github.com/victoriyaforsythe/PyIRI
 # ----------------------------------------------------------
 # Distribution statement A. Approved for public release.
 # Distribution is unlimited.
