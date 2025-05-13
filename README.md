@@ -37,17 +37,10 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
+      <a href="#about-the-project">About The Project</a>      
     </li>
     <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
+      <a href="#getting-started">Getting Started</a>      
     </li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="#license">License</a></li>
@@ -71,10 +64,6 @@ To access AIDA model output and forecast products, it is necessary to create a f
 
 <!-- GETTING STARTED -->
 ## Getting Started
-
-### Prerequisites
-
-
 
 ### Installation (Local Computer)
 
@@ -107,10 +96,18 @@ $ pip freeze | grep aida
 ```
 
 
+### Configuring the AIDA API
 
-### Finding AIDA Output Files on BlueBEAR
 
-Output from the online AIDA models can be found at `/rds/projects/e/elvidgsm-dasp/DASP-website/AIDA_output/archive/{model}/{yyyy}/{doy}/`.
+AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. When `aida` is installed, it will include a file called `api_config.ini` in the project directory. This file must be edited to include two pieces of information.
+
+**API Token:**
+To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 
+
+**Output Cache:**
+AIDA will need a location to cache output files in order to produce output, which is configurable in `api_config.ini`. This path is broken into two parts, the `folder` and the `subfolder`. This allows AIDA to sort the output into (and create) subdirectories. The `folder` gives the path to the top-level directory, which must already exist. The `subfolder` contains a series of tags which allow AIDA to create subfolders based on the date of the output file. 
+
+**WARNING: There is no automatic cleanup of cached output files**
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -126,6 +123,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
 ```
+
 
 ### AIDA State Object
 
@@ -347,15 +345,13 @@ sTEC = np.trapz(Ne, d)  # array([3.36102813e+17])
 
 ```
 
-_For more examples, please refer to the [Documentation](https://example.com)_
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 <!-- LICENSE -->
 ## License
 
-Will be distributed under a licence. See `LICENSE.txt` for more information.
+The AIDA interpreter is distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
