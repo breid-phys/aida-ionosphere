@@ -74,7 +74,7 @@ def api_config(filename: str | Path = None):
 
             config_struct[section][option] = value
 
-    if np.sum(int(config['api']['token'])) == 0:
+    if np.sum(int(config['api']['token'], 16)) == 0:
         raise APIConfigurationError(f" invalid token in file {filename.expanduser()}, check configuration file and edit if needed.")
 
     if config['cache']['folder'] == '/path/to/cache/':
@@ -318,7 +318,7 @@ def downloadOutput(
             f.write(response.content)
         return outputFile
     else:
-        raise ValueError(f"{response.status_code} {response.text}")
+        raise APIError(f"{response.status_code} {response.text}")
 
 
 ###############################################################################
@@ -326,5 +326,11 @@ def downloadOutput(
 
 class APIConfigurationError(Exception):
     def __init__(self, message=" problem in the API config file"):
+        self.message = message
+        super().__init__(self.message)
+
+
+class APIError(Exception):
+    def __init__(self, message=" problem in the API"):
         self.message = message
         super().__init__(self.message)

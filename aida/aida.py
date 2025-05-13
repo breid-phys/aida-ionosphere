@@ -536,12 +536,14 @@ class AIDAState(object):
 
     def fromAPI(
             self,
-            time: datetime.datetime | np.datetime64 = None,
+            time: datetime.datetime | np.datetime64 | str = None,
             model: str = None,
             latency: str = None,
             config: Path | dict = None) -> None:
 
-        if isinstance(time, datetime.datetime):
+        if isinstance(time, str) and time == 'now':
+            time = dt2npdt(datetime.datetime.now(datetime.UTC)) - np.timedelta64(5, 'm')
+        elif isinstance(time, datetime.datetime):
             time = dt2npdt(time)
 
         # round to nearest 5 mins
