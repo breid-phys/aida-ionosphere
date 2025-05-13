@@ -15,14 +15,16 @@ import h5py
 import numpy as np
 import xarray
 from scipy.integrate import cumulative_trapezoid
+import datetime
 
-from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
+from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch, dt2npdt
 from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics
 from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
 from .exceptions import ConfigurationMismatch
+from .api import downloadOutput
 
 logger = AIDAlogger(__name__)
 
@@ -529,6 +531,45 @@ class AIDAState(object):
             raise ValueError(" missing background parameters.")
 
         return Background
+
+    ###########################################################################
+
+    def fromAPI(
+            self,
+            time: datetime.datetime | np.datetime64 = None,
+            model: str = None,
+            latency: str = None,
+            config: Path | dict = None) -> None:
+
+        if isinstance(time, datetime.datetime):
+            time = dt2npdt(time)
+
+        # round to nearest 5 mins
+        epoch = npdt2epoch(time)
+        epoch = np.round(epoch / (5 * 60)) * (5 * 60)
+        time = epoch2npdt(epoch)
+
+        if model.upper() == 'AIDA':
+            if latency == 'ultra' or latency == 'u':
+                filename = downloadOutput(config, time, 'ultra')
+            elif latency == 'rapid' or latency == 'r':
+                filename = downloadOutput(config, time, 'rapid')
+            elif latency == 'daily' or latency == 'd':
+                filename = downloadOutput(config, time, 'daily')
+            else:
+                raise ValueError(
+                    f" unrecognized latency {latency}. Valid options are 'ultra', 'rapid', or 'daily'")
+        elif model.upper() == 'TOMIRIS':
+            raise NotImplementedError(
+                ' API support for TOMIRIS output is not yet available')
+            if latency == 'ultra' or latency == 'u':
+                filename = downloadOutput(config, time, 'ultra')
+            elif latency == 'rapid' or latency == 'r':
+                filename = downloadOutput(config, time, 'rapid')
+        else:
+            raise ValueError(f' unrecognized model {model}')
+
+        return self.readFile(filename)
 
     ###########################################################################
 

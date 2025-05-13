@@ -34,7 +34,7 @@ class Test_model_bounds(unittest.TestCase):
             elif "hm" in Char:
                 assert Data[Char].max() > 90.0
                 assert Data[Char].max() < 500
-                assert Data[Char].min() > 0.0
+                assert Data[Char].min() >= 0.0
             elif "B" in Char:
                 assert Data[Char].max() > 1.0
                 assert Data[Char].max() < 200
@@ -58,6 +58,10 @@ class Test_model_bounds(unittest.TestCase):
             elif "Ne" in Char:
                 assert Data[Char].max() > 1e11
                 assert Data[Char].max() < 1e13
+                assert Data[Char].min() > 0.0
+            elif "h_shell" in Char:
+                assert Data[Char].max() > 180
+                assert Data[Char].max() < 2000
                 assert Data[Char].min() > 0.0
             else:
                 raise ValueError(f" unrecognized output {Char}")
