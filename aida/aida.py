@@ -536,40 +536,62 @@ class AIDAState(object):
 
     def fromAPI(
             self,
-            time: datetime.datetime | np.datetime64 | str = None,
-            model: str = None,
-            latency: str = None,
-            config: Path | dict = None) -> None:
+            time: datetime.datetime | np.datetime64 | str,
+            model: str,
+            latency: str,
+            APIconfig: Path | dict = None,
+            forecast: int | np.datetime64 = 0) -> None:
+        """
+        fromAPI() uses the AIDA API to download an output file, and populate the state object.
 
-        if isinstance(time, str) and time == 'now':
-            time = dt2npdt(datetime.datetime.now(datetime.UTC)) - np.timedelta64(5, 'm')
-        elif isinstance(time, datetime.datetime):
+        Parameters
+        ----------
+        time : datetime.datetime | np.datetime64 | str
+            The desired time to model. Will automatically be rounded down to the nearest 5 minutes.
+            Can be given the keyword 'latest' to download the latest output for the specified model.
+        model : str
+            Model whose output is desired. Valid options are:
+           'AIDA', the data assimilation model based on Nequick
+           'TOMIRIS', the data assimilation model based on the IRI
+        latency : str
+            Which model latency to download. Valid options are:
+            'ultra', the real-time output
+            'rapid', the near-real-time output
+            'daily', the final product (AIDA only)
+        APIconfig : Path | dict, optional
+            path to the API config file to use, by default None
+        forecast : int | np.datetime64, optional
+            forecast length time in minutes, by default 0
+            Only 30, 90, 180, and 360 minutes are supported.
+
+        Returns
+        -------
+        None
+            This function populates the State object, and has no return value.
+
+        Raises
+        ------
+        ValueError
+            A ValueError is returned if any unsupported keywords are provided.
+        NotImplementedError
+            TODO: add TOMIRIS support once the API backend is in place.
+        """
+
+        if isinstance(time, datetime.datetime):
             time = dt2npdt(time)
 
-        # round to nearest 5 mins
-        epoch = npdt2epoch(time)
-        epoch = np.round(epoch / (5 * 60)) * (5 * 60)
-        time = epoch2npdt(epoch)
+        if not isinstance(time, str):
+            # round to nearest 5 mins
+            epoch = npdt2epoch(time)
+            epoch = np.round(epoch / (5 * 60)) * (5 * 60)
+            time = epoch2npdt(epoch)
 
-        if model.upper() == 'AIDA':
-            if latency == 'ultra' or latency == 'u':
-                filename = downloadOutput(config, time, 'ultra')
-            elif latency == 'rapid' or latency == 'r':
-                filename = downloadOutput(config, time, 'rapid')
-            elif latency == 'daily' or latency == 'd':
-                filename = downloadOutput(config, time, 'daily')
-            else:
-                raise ValueError(
-                    f" unrecognized latency {latency}. Valid options are 'ultra', 'rapid', or 'daily'")
-        elif model.upper() == 'TOMIRIS':
-            raise NotImplementedError(
-                ' API support for TOMIRIS output is not yet available')
-            if latency == 'ultra' or latency == 'u':
-                filename = downloadOutput(config, time, 'ultra')
-            elif latency == 'rapid' or latency == 'r':
-                filename = downloadOutput(config, time, 'rapid')
-        else:
-            raise ValueError(f' unrecognized model {model}')
+        filename = downloadOutput(
+            APIconfig,
+            time=time,
+            latency=latency,
+            model=model,
+            forecast=forecast)
 
         return self.readFile(filename)
 
@@ -1611,7 +1633,8 @@ class AIDAState(object):
             ri = use_i
             if N is not None and ri.size != N:
                 raise ValueError(
-                    f" requested size {N} and provided index of size {ri.size} do not match")
+                    f" requested size {N} and "
+                    f"provided index of size {ri.size} do not match")
 
         W = (1.0 / N) * np.ones(N)
         ModelState.Filter["Weight"] = W

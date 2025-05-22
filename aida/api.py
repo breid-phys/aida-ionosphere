@@ -12,9 +12,11 @@ import datetime
 import xarray
 import requests
 import os
+import io
+import h5py
 
-from .logger import AIDAlogger
-from .time import npdt2dt
+from aida.logger import AIDAlogger
+from aida.time import npdt2dt, epoch2npdt
 
 
 logger = AIDAlogger(__name__)
@@ -53,7 +55,8 @@ def api_config(filename: str | Path = None):
 
     # Check filename exists
     if not filename.exists():
-        raise FileNotFoundError(f"ERROR: file {filename.expanduser()} not found")
+        raise FileNotFoundError(
+            f"ERROR: file {filename.expanduser()} not found")
 
     config = configparser.ConfigParser(delimiters=(";", "="), strict=True)
 
@@ -75,12 +78,15 @@ def api_config(filename: str | Path = None):
             config_struct[section][option] = value
 
     if np.sum(int(config['api']['token'], 16)) == 0:
-        raise APIConfigurationError(f" invalid token in file {filename.expanduser()}, check configuration file and edit if needed.")
+        raise APIConfigurationError(
+            f" invalid token in file {filename.expanduser()}, check configuration file and edit if needed.")
 
     if config['cache']['folder'] == '/path/to/cache/':
-        raise APIConfigurationError(f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
+        raise APIConfigurationError(
+            f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
     elif not Path(config['cache']['folder']).exists():
-        raise APIConfigurationError(f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
+        raise APIConfigurationError(
+            f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
 
     return config_struct
 ###############################################################################
@@ -262,61 +268,171 @@ def _date_dict(time, keys):
 ###############################################################################
 
 
-def downloadOutput(
-        config: Path | dict,
+def _generateFilename(
+        APIconfig,
         time: np.datetime64,
-        model: str) -> Path:
+        model: str,
+        latency: str,
+        forecast: int | np.timedelta64 = 0) -> Path:
 
-    if not isinstance(config, dict):
-        config = api_config(config)
+    if latency == "ultra":
+        latency_tag = "u"
+    elif latency == "rapid":
+        latency_tag = "r"
+    elif latency == "daily" or latency == "final":
+        latency_tag = "d"
+        latency = "final"
+    else:
+        raise ValueError(f" unrecognized latency {latency}")
 
-    if model == "ultra":
-        model_tag = "u"
-    elif model == "rapid":
-        model_tag = "r"
-    elif model == "daily" or model == "final":
-        model_tag = "d"
-        model = "final"
+    if model.upper() == 'AIDA':
+        model_tag = 'aida'
+    elif model.upper() == 'TOMIRIS':
+        model_tag = 'tomiris'
     else:
         raise ValueError(f" unrecognized model {model}")
 
-    cacheFolder = Path(config['cache']['folder'])
+    if not isinstance(APIconfig, dict):
+        APIconfig = api_config(APIconfig)
+
+    cacheFolder = Path(APIconfig['cache']['folder'])
+
+    subFolder = cacheFolder.joinpath(
+        createFilename(
+            APIconfig['cache']['subfolder'],
+            time)[0])
+
+    if forecast == 0:
+        outputFile = subFolder.joinpath(
+            createFilename(
+                "output_{model}_{latency}_{yy}{mm}{dd}_{HH}{MM}{SS}.h5",
+                time,
+                model=model_tag,
+                latency=latency_tag)[0])
+    else:
+        outputFile = subFolder.joinpath(
+            createFilename(
+                "output_{model}_{latency}_f{fcast:03d}_{yy}{mm}{dd}_{HH}{MM}{SS}.h5",
+                time,
+                fcast=forecast,
+                model=model_tag,
+                latency=latency_tag)[0])
+
+    return outputFile
+
+
+def downloadOutput(
+        APIconfig: Path | dict,
+        time: np.datetime64 | str,
+        model: str,
+        latency: str,
+        forecast: int | np.timedelta64 = 0) -> Path:
+
+    if not isinstance(APIconfig, dict):
+        APIconfig = api_config(APIconfig)
+
+    cacheFolder = Path(APIconfig['cache']['folder'])
 
     if not cacheFolder.exists():
         raise FileNotFoundError(
             ' attempted to write to a cache folder which does not exist. Check that api_config.ini is configured correctly.'
         )
 
-    outputFile = cacheFolder.joinpath(
-        createFilename(
-            config['cache']['subfolder'],
-            time)[0]).joinpath(
-        createFilename(
-            "output_{model}_{yy}{mm}{dd}_{HH}{MM}{SS}.h5",
-            time,
-            model=model_tag)[0])
+    if isinstance(forecast, np.timedelta64):
+        forecast = forecast / np.timedelta64(1, 'm')
 
-    if outputFile.exists():
-        return outputFile
+    if model.upper() == 'AIDA':
+        if latency == "ultra":
+            model_api = 'ultra'
+        elif latency == "rapid":
+            model_api = 'rapid'
+        elif latency == "daily" or latency == "final":
+            model_api = "final"
+        else:
+            raise ValueError(f" unrecognized latency {latency}")
+    elif model.upper() == 'TOMIRIS':
+        if latency == "ultra":
+            model_api = 'ultra'
+        elif latency == "rapid":
+            model_api = 'rapid'
+        elif latency == "daily" or latency == "final":
+            model_api = "final"
+        else:
+            raise ValueError(f" unrecognized latency {latency}")
+    else:
+        raise ValueError(f" unrecognized model {model}")
 
-    if not outputFile.parent.exists():
-        os.makedirs(outputFile.parent.expanduser())
+    if time == 'latest':
+        if forecast != 0:
+            raise ValueError(" 'latest' not available for forecast outputs")
 
-    payload = {
-        "file_time": time.astype('str'),
-        "product": model,
-        "file_type": "raw"}
+        url = "https://spaceweather.bham.ac.uk/api/download-output/"
+
+        payload = {
+            "latest": True,
+            "product": model_api,
+            "file_type": "raw"}
+
+        outputFile = None
+    else:
+        # generate filename
+        outputFile = _generateFilename(
+            APIconfig, time, model, latency, forecast)
+
+        if forecast == 0:
+            url = "https://spaceweather.bham.ac.uk/api/download-output/"
+
+            payload = {
+                "file_time": time.astype('str'),
+                "product": model_api,
+                "file_type": "raw"}
+
+        else:
+            url = "https://spaceweather.bham.ac.uk/api/download-forecast/"
+
+            payload = {
+                "file_time": time.astype('str'),
+                "product": model_api,
+                "file_type": "raw",
+                "period": int(forecast)}
+
+    if outputFile is not None:
+        # skip if 'latest'
+        if outputFile.exists():
+            return outputFile
+
+        if not outputFile.parent.exists():
+            os.makedirs(outputFile.parent.expanduser())
 
     response = requests.get(
-        "https://spaceweather.bham.ac.uk/api/download-output/",
+        url,
         headers={
-            'Authorization': f"Token {config['api']['token']}"},
-        data=payload)
+            'Authorization': f"Token {APIconfig['api']['token']}"},
+        data=payload,
+        timeout=int(APIconfig['api']['timeout']))
 
     if response.status_code == 200:
+        if outputFile is None:
+            # read binary data to get file time
+            with h5py.File(io.BytesIO(response.content), "r") as openFile:
+                time = epoch2npdt(openFile["Time"][()])
+            outputFile = _generateFilename(
+                APIconfig, time, model, latency, forecast)
+
+            if outputFile.exists():
+                return outputFile
+
+            if not outputFile.parent.exists():
+                os.makedirs(outputFile.parent.expanduser())
+
         with open(outputFile, 'wb') as f:
             f.write(response.content)
         return outputFile
+    elif response.status_code == 502:
+        # BEAR has a rich 502 error screen which does not display well
+        text = """Gateway Error. Please try again in a few minutes and if the error persists,
+          please report the issue to spaceweather@bham.ac.uk"""
+        raise APIError(f"{response.status_code} {text}")
     else:
         raise APIError(f"{response.status_code} {response.text}")
 
