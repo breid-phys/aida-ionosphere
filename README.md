@@ -134,7 +134,22 @@ All AIDA calculations are performed through the `AIDAState` class.
 Model = aida.AIDAState()
 ```
 
-An AIDA State must be populated with data from an AIDA output file using the `AIDAState.readFile()` method. 
+An AIDA State must be populated with data. The AIDA State can download and read files automatically using the `AIDAState.fromAPI()` method.
+
+```py
+Model.fromAPI(time=np.datetime64("2024-11-01T13:55:00"),
+                  model='AIDA',
+                  latency='rapid',
+                  forecast=90)
+```
+
+To download the latest output for a given model, pass the argument `time='latest'`.
+
+```py
+    Model.fromAPI(time='latest', model='AIDA', latency='ultra')
+```
+
+An AIDA State can also be told to read an AIDA output file using the `AIDAState.readFile()` method. 
 
 ```py
 # load test output file
