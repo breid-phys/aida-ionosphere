@@ -79,14 +79,17 @@ def api_config(filename: str | Path = None):
 
     if np.sum(int(config['api']['token'], 16)) == 0:
         raise APIConfigurationError(
-            f" invalid token in file {filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid token in file {
+                filename.expanduser()}, check configuration file and edit if needed.")
 
     if config['cache']['folder'] == '/path/to/cache/':
         raise APIConfigurationError(
-            f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid cache in file {
+                filename.expanduser()}, check configuration file and edit if needed.")
     elif not Path(config['cache']['folder']).exists():
         raise APIConfigurationError(
-            f" invalid cache in file {filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid cache in file {
+                filename.expanduser()}, check configuration file and edit if needed.")
 
     return config_struct
 ###############################################################################
@@ -321,12 +324,11 @@ def _generateFilename(
     return outputFile
 
 
-def downloadOutput(
-        APIconfig: Path | dict,
-        time: np.datetime64 | str,
-        model: str,
-        latency: str,
-        forecast: int | np.timedelta64 = 0) -> Path:
+def downloadOutput(APIconfig: Path | dict,
+                   time: np.datetime64 | str,
+                   model: str,
+                   latency: str,
+                   forecast: int | np.timedelta64 = 0) -> Path:
 
     if not isinstance(APIconfig, dict):
         APIconfig = api_config(APIconfig)
@@ -351,6 +353,8 @@ def downloadOutput(
         else:
             raise ValueError(f" unrecognized latency {latency}")
     elif model.upper() == 'TOMIRIS':
+        raise NotImplementedError('TOMIRIS API support not yet implemented')
+        """
         if latency == "ultra":
             model_api = 'ultra'
         elif latency == "rapid":
@@ -359,6 +363,7 @@ def downloadOutput(
             model_api = "final"
         else:
             raise ValueError(f" unrecognized latency {latency}")
+        """
     else:
         raise ValueError(f" unrecognized model {model}")
 
@@ -368,16 +373,13 @@ def downloadOutput(
 
         url = "https://spaceweather.bham.ac.uk/api/download-output/"
 
-        payload = {
-            "latest": True,
-            "product": model_api,
-            "file_type": "raw"}
+        payload = {"latest": True, "product": model_api, "file_type": "raw"}
 
         outputFile = None
     else:
         # generate filename
-        outputFile = _generateFilename(
-            APIconfig, time, model, latency, forecast)
+        outputFile = _generateFilename(APIconfig, time, model, latency,
+                                       forecast)
 
         if forecast == 0:
             url = "https://spaceweather.bham.ac.uk/api/download-output/"
@@ -385,7 +387,8 @@ def downloadOutput(
             payload = {
                 "file_time": time.astype('str'),
                 "product": model_api,
-                "file_type": "raw"}
+                "file_type": "raw"
+            }
 
         else:
             url = "https://spaceweather.bham.ac.uk/api/download-forecast/"
@@ -394,7 +397,8 @@ def downloadOutput(
                 "file_time": time.astype('str'),
                 "product": model_api,
                 "file_type": "raw",
-                "period": int(forecast)}
+                "period": int(forecast)
+            }
 
     if outputFile is not None:
         # skip if 'latest'
@@ -406,35 +410,27 @@ def downloadOutput(
 
     response = requests.get(
         url,
-        headers={
-            'Authorization': f"Token {APIconfig['api']['token']}"},
+        headers={'Authorization': f"Token {APIconfig['api']['token']}"},
         data=payload,
         timeout=int(APIconfig['api']['timeout']))
 
-    if response.status_code == 200:
-        if outputFile is None:
-            # read binary data to get file time
-            with h5py.File(io.BytesIO(response.content), "r") as openFile:
-                time = epoch2npdt(openFile["Time"][()])
-            outputFile = _generateFilename(
-                APIconfig, time, model, latency, forecast)
+    response.raise_for_status()
 
-            if outputFile.exists():
-                return outputFile
+    if outputFile is None:
+        # read binary data to get file time
+        with h5py.File(io.BytesIO(response.content), "r") as openFile:
+            time = epoch2npdt(openFile["Time"][()])
+        outputFile = _generateFilename(APIconfig, time, model, latency,
+                                       forecast)
 
-            if not outputFile.parent.exists():
-                os.makedirs(outputFile.parent.expanduser())
+        if outputFile.exists():
+            return outputFile
 
-        with open(outputFile, 'wb') as f:
-            f.write(response.content)
-        return outputFile
-    elif response.status_code == 502:
-        # BEAR has a rich 502 error screen which does not display well
-        text = """Gateway Error. Please try again in a few minutes and if the error persists,
-          please report the issue to spaceweather@bham.ac.uk"""
-        raise APIError(f"{response.status_code} {text}")
-    else:
-        raise APIError(f"{response.status_code} {response.text}")
+        os.makedirs(outputFile.parent.expanduser(), exist_ok=True)
+
+    with open(outputFile, 'wb') as f:
+        f.write(response.content)
+    return outputFile
 
 
 ###############################################################################

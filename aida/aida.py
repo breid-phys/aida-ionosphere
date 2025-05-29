@@ -572,9 +572,7 @@ class AIDAState(object):
         Raises
         ------
         ValueError
-            A ValueError is returned if any unsupported keywords are provided.
-        NotImplementedError
-            TODO: add TOMIRIS support once the API backend is in place.
+            A ValueError is returned if any unsupported keywords are provided.        
         """
 
         if isinstance(time, datetime.datetime):
