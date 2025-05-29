@@ -756,8 +756,10 @@ class AIDAState(object):
                 }
             elif "hm" in Char:
                 Output[Char] = np.fmax(Output[Char], 0.0)
-                CharAttributes = {"units": "km", "description":
-                                  f"altitude of the {Char[2:]} layer peak density"}
+                CharAttributes = {
+                    "units": "km",
+                    "description": f"altitude of the {Char[2:]} layer peak density",
+                }
             elif "B" == Char[0] and len(Char) > 2:
                 Output[Char] = np.fmax(Output[Char], 1.0)
 
