@@ -79,17 +79,17 @@ def api_config(filename: str | Path = None):
 
     if np.sum(int(config['api']['token'], 16)) == 0:
         raise APIConfigurationError(
-            f" invalid token in file {
-                filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid token in file {filename.expanduser()},"
+            " check configuration file and edit if needed.")
 
     if config['cache']['folder'] == '/path/to/cache/':
         raise APIConfigurationError(
-            f" invalid cache in file {
-                filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid cache in file {filename.expanduser()},"
+            " check configuration file and edit if needed.")
     elif not Path(config['cache']['folder']).exists():
         raise APIConfigurationError(
-            f" invalid cache in file {
-                filename.expanduser()}, check configuration file and edit if needed.")
+            f" invalid cache in file {filename.expanduser()},"
+            " check configuration file and edit if needed.")
 
     return config_struct
 ###############################################################################

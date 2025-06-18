@@ -7,7 +7,7 @@ Created on Tue Jun 20 17:50:47 2023
 """
 
 import logging
-
+import time
 
 class AIDALoggerList:
     names = []
@@ -26,6 +26,7 @@ def AIDAlogger(name):
         formatter = logging.Formatter(
             fmt="%(asctime)s:%(levelname)s:%(name)s:%(message)s", datefmt="%H:%M:%S"
         )
+        formatter.converter = time.gmtime
         screen_handler = logging.StreamHandler()
         screen_handler.setFormatter(formatter)
         logger.addHandler(screen_handler)
