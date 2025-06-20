@@ -111,8 +111,7 @@ $ pip freeze | grep aida
 
 ### Configuring the AIDA API
 
-
-AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. When `aida` is installed, it will include a file called `api_config.ini` in the project directory. This file must be edited to include two pieces of information.
+AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. By default, `aida` will look for a file called `api_config.ini` in the user's home directory. This file must be edited to include two pieces of information.
 
 **API Token:**
 To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 
@@ -122,6 +121,7 @@ AIDA will need a location to cache output files in order to produce output, whic
 
 **WARNING: There is no automatic cleanup of cached output files**
 
+A blank example file can be found in the project directory, which can be copied to the home directory. The location of this example file can be found by calling `aida.api.find_api_config()`. 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -147,10 +147,10 @@ All AIDA calculations are performed through the `AIDAState` class.
 Model = aida.AIDAState()
 ```
 
-An AIDA State must be populated with data. The AIDA State can download and read files automatically using the `AIDAState.fromAPI()` method.
+An AIDA State must be populated with data. The AIDA State can download and read files automatically using the `AIDAState.fromAPI()` method. If the config file is located somewhere other than the default location, it can be passed to `aida.AIDAState()` as an argument `APIconfig`.
 
 ```py
-Model.fromAPI(time=np.datetime64("2024-11-01T13:55:00"),
+Model.fromAPI(time=np.datetime64("2025-01-01T13:55:00"),
                   model='AIDA',
                   latency='rapid',
                   forecast=90)

@@ -24,6 +24,13 @@ logger = AIDAlogger(__name__)
 ###############################################################################
 
 
+def find_api_config():
+    return resources.files("aida").joinpath("api_config.ini")
+
+
+###############################################################################
+
+
 def api_config(filename: str | Path = None):
     """Read a AIDA input file (in .ini format)
 
@@ -48,7 +55,7 @@ def api_config(filename: str | Path = None):
 
     # default config file
     if filename is None:
-        filename = resources.files("aida").joinpath("api_config.ini")
+        filename = Path.home().joinpath("api_config.ini")
 
     if not isinstance(filename, Path):
         filename = Path(filename)
@@ -443,6 +450,7 @@ class APIConfigurationError(Exception):
 
 
 class APIError(Exception):
+
     def __init__(self, message=" problem in the API"):
         self.message = message
         super().__init__(self.message)
