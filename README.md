@@ -159,7 +159,7 @@ Model.fromAPI(time=np.datetime64("2025-01-01T13:55:00"),
 To download the latest output for a given model, pass the argument `time='latest'`.
 
 ```py
-    Model.fromAPI(time='latest', model='AIDA', latency='ultra')
+Model.fromAPI(time='latest', model='AIDA', latency='ultra')
 ```
 
 An AIDA State can also be told to read an AIDA output file using the `AIDAState.readFile()` method. 
