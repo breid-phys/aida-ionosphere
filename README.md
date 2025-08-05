@@ -114,7 +114,7 @@ $ pip freeze | grep aida
 AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. By default, `aida` will look for a file called `api_config.ini` in the user's home directory. This file must be edited to include two pieces of information.
 
 **API Token:**
-To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 
+To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found on the [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 
 
 **Output Cache:**
 AIDA will need a location to cache output files in order to produce output, which is configurable in `api_config.ini`. This path is broken into two parts, the `folder` and the `subfolder`. This allows AIDA to sort the output into (and create) subdirectories. The `folder` gives the path to the top-level directory, which must already exist. The `subfolder` contains a series of tags which allow AIDA to create subfolders based on the date of the output file. 
