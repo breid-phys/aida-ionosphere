@@ -151,9 +151,9 @@ An AIDA State must be populated with data. The AIDA State can download and read 
 
 ```py
 Model.fromAPI(time=np.datetime64("2025-01-01T13:55:00"),
-                  model='AIDA',
-                  latency='rapid',
-                  forecast=90)
+              model='AIDA',
+              latency='rapid',
+              forecast=90)
 ```
 
 To download the latest output for a given model, pass the argument `time='latest'`.
