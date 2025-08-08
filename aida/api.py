@@ -84,17 +84,17 @@ def api_config(filename: str | Path = None):
 
             config_struct[section][option] = value
 
-    if np.sum(int(config['api']['token'], 16)) == 0:
+    if 'token' not in config['api']:
         raise APIConfigurationError(
-            f" invalid token in file {filename.expanduser()},"
+            f" no valid token in file {filename.expanduser()},"
             " check configuration file and edit if needed.")
 
     if config['cache']['folder'] == '/path/to/cache/':
-        raise APIConfigurationError(
+        raise FileNotFoundError(
             f" invalid cache in file {filename.expanduser()},"
             " check configuration file and edit if needed.")
     elif not Path(config['cache']['folder']).exists():
-        raise APIConfigurationError(
+        raise FileNotFoundError(
             f" invalid cache in file {filename.expanduser()},"
             " check configuration file and edit if needed.")
 
@@ -102,7 +102,7 @@ def api_config(filename: str | Path = None):
 ###############################################################################
 
 
-def createFilename(pattern, time=None, **kwargs):
+def createFilenames(pattern, time=None, **kwargs):
     """
 
 
@@ -168,7 +168,7 @@ def createFilename(pattern, time=None, **kwargs):
     if isinstance(pattern, list):
         output = []
         for p in pattern:
-            output += createFilename(p, time=time, **kwargs)
+            output += createFilenames(p, time=time, **kwargs)
         return output
 
     for key in kwargs:  # make sure keyword tags are in an iterable form
@@ -308,20 +308,20 @@ def _generateFilename(
     cacheFolder = Path(APIconfig['cache']['folder'])
 
     subFolder = cacheFolder.joinpath(
-        createFilename(
+        createFilenames(
             APIconfig['cache']['subfolder'],
             time)[0])
 
     if forecast == 0:
         outputFile = subFolder.joinpath(
-            createFilename(
+            createFilenames(
                 "output_{model}_{latency}_{yy}{mm}{dd}_{HH}{MM}{SS}.h5",
                 time,
                 model=model_tag,
                 latency=latency_tag)[0])
     else:
         outputFile = subFolder.joinpath(
-            createFilename(
+            createFilenames(
                 "output_{model}_{latency}_f{fcast:03d}_{yy}{mm}{dd}_{HH}{MM}{SS}.h5",
                 time,
                 fcast=forecast,
