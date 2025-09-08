@@ -37,17 +37,10 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
+      <a href="#about-the-project">About The Project</a>      
     </li>
     <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
+      <a href="#getting-started">Getting Started</a>      
     </li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="#license">License</a></li>
@@ -71,10 +64,6 @@ To access AIDA model output and forecast products, it is necessary to create a f
 
 <!-- GETTING STARTED -->
 ## Getting Started
-
-### Prerequisites
-
-
 
 ### Installation (Local Computer)
 
@@ -120,11 +109,19 @@ $ pip freeze | grep aida
 ```
 
 
+### Configuring the AIDA API
 
-### Finding AIDA Output Files on BlueBEAR
+AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. By default, `aida` will look for a file called `api_config.ini` in the user's home directory. This file must be edited to include two pieces of information.
 
-Output from the online AIDA models can be found at `/rds/projects/e/elvidgsm-dasp/DASP-website/AIDA_output/archive/{model}/{yyyy}/{doy}/`.
+**API Token:**
+To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found on the [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 
 
+**Output Cache:**
+AIDA will need a location to cache output files in order to produce output, which is configurable in `api_config.ini`. This path is broken into two parts, the `folder` and the `subfolder`. This allows AIDA to sort the output into (and create) subdirectories. The `folder` gives the path to the top-level directory, which must already exist. The `subfolder` contains a series of tags which allow AIDA to create subfolders based on the date of the output file. 
+
+**WARNING: There is no automatic cleanup of cached output files**
+
+A blank example file can be found in the project directory, which can be copied to the home directory. The location of this example file can be found by calling `aida.api.find_api_config()`. 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -140,6 +137,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps
 ```
 
+
 ### AIDA State Object
 
 All AIDA calculations are performed through the `AIDAState` class.
@@ -149,7 +147,22 @@ All AIDA calculations are performed through the `AIDAState` class.
 Model = aida.AIDAState()
 ```
 
-An AIDA State must be populated with data from an AIDA output file using the `AIDAState.readFile()` method. 
+An AIDA State must be populated with data. The AIDA State can download and read files automatically using the `AIDAState.fromAPI()` method. If the config file is located somewhere other than the default location, it can be passed to `aida.AIDAState()` as an argument `APIconfig`.
+
+```py
+Model.fromAPI(time=np.datetime64("2025-01-01T13:55:00"),
+              model='AIDA',
+              latency='rapid',
+              forecast=90)
+```
+
+To download the latest output for a given model, pass the argument `time='latest'`.
+
+```py
+Model.fromAPI(time='latest', model='AIDA', latency='ultra')
+```
+
+An AIDA State can also be told to read an AIDA output file using the `AIDAState.readFile()` method. 
 
 ```py
 # load test output file
@@ -360,15 +373,13 @@ sTEC = np.trapz(Ne, d)  # array([3.36102813e+17])
 
 ```
 
-_For more examples, please refer to the [Documentation](https://example.com)_
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 <!-- LICENSE -->
 ## License
 
-Will be distributed under a licence. See `LICENSE.txt` for more information.
+The AIDA interpreter is distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

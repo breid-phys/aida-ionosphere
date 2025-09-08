@@ -15,14 +15,16 @@ import h5py
 import numpy as np
 import xarray
 from scipy.integrate import cumulative_trapezoid
+import datetime
 
-from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch
+from .time import dt2epoch, epoch2dt, epoch2npdt, npdt2epoch, dt2npdt
 from .ne import Ne_AIDA, Ne_NeQuick, Ne_IRI, Ne_IRI_stec, sph_harmonics
 from .iri import newton_hmF1, NmE_min
 from .logger import AIDAlogger
 from .parameter import Parameter
 from .modip import Modip
 from .exceptions import ConfigurationMismatch
+from .api import downloadOutput
 
 logger = AIDAlogger(__name__)
 
@@ -529,6 +531,67 @@ class AIDAState(object):
             raise ValueError(" missing background parameters.")
 
         return Background
+
+    ###########################################################################
+
+    def fromAPI(
+            self,
+            time: datetime.datetime | np.datetime64 | str,
+            model: str,
+            latency: str,
+            APIconfig: Path | dict = None,
+            forecast: int | np.datetime64 = 0) -> None:
+        """
+        fromAPI() uses the AIDA API to download an output file, and populate the state object.
+
+        Parameters
+        ----------
+        time : datetime.datetime | np.datetime64 | str
+            The desired time to model. Will automatically be rounded down to the nearest 5 minutes.
+            Can be given the keyword 'latest' to download the latest output for the specified model.
+        model : str
+            Model whose output is desired. Valid options are:
+           'AIDA', the data assimilation model based on Nequick
+           'TOMIRIS', the data assimilation model based on the IRI
+        latency : str
+            Which model latency to download. Valid options are:
+            'ultra', the real-time output
+            'rapid', the near-real-time output
+            'daily', the final product (AIDA only)
+        APIconfig : Path | dict, optional
+            path to the API config file to use, by default None
+        forecast : int | np.datetime64, optional
+            forecast length time in minutes, by default 0
+            Only 30, 90, 180, and 360 minutes are supported.
+
+        Returns
+        -------
+        None
+            This function populates the State object, and has no return value.
+
+        Raises
+        ------
+        ValueError
+            A ValueError is returned if any unsupported keywords are provided.        
+        """
+
+        if isinstance(time, datetime.datetime):
+            time = dt2npdt(time)
+
+        if not isinstance(time, str):
+            # round to nearest 5 mins
+            epoch = npdt2epoch(time)
+            epoch = np.round(epoch / (5 * 60)) * (5 * 60)
+            time = epoch2npdt(epoch)
+
+        filename = downloadOutput(
+            APIconfig,
+            time=time,
+            latency=latency,
+            model=model,
+            forecast=forecast)
+
+        return self.readFile(filename)
 
     ###########################################################################
 
@@ -1570,9 +1633,8 @@ class AIDAState(object):
             ri = use_i
             if N is not None and ri.size != N:
                 raise ValueError(
-                    f" requested size {N} and provided index of size"
-                    f" {ri.size} do not match"
-                )
+                    f" requested size {N} and "
+                    f"provided index of size {ri.size} do not match")
 
         W = (1.0 / N) * np.ones(N)
         ModelState.Filter["Weight"] = W
