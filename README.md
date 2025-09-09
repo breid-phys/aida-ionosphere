@@ -71,43 +71,12 @@ _Currently the AIDA interpreter must be installed using git. In the future the m
 
 1. Clone the repo
    ```sh
-   git clone https://gitlab.bham.ac.uk/elvidgsm-dasp/aida-ionosphere.git
+   git clone https://github.com/breid-phys/aida-ionosphere.git
    ```
 2. Install aida package
    ```sh
    python -m pip install -e /path/to/aida
    ```
-
-  The openmpi dependency will require installation first:
-
-  On Ubuntu:
-  ```sh
-    sudo apt install libopenmpi-dev
-  ```
-
-  On Fedora:
-  ```sh
-    sudo dnf install openmpi-devel
-  ```
-
-
-### Installation (BlueBEAR)
-
-_The AIDA interpreter is already available on BlueBEAR through the `dasp` project virtual environment._
-
-```sh
-$ module purge; module load bluebear
-$ module load Python/3.9.5-GCCcore-10.3.0-bare
-$ source /rds/projects/e/elvidgsm-dasp/DASP-website/code/venv/bin/activate 
-```
-
-_You can check if the package is available using the command `pip freeze`, which will print all currently installed python packages._
-
-```sh
-$ pip freeze | grep aida
-  ionodasp @ file:///rds/projects/e/elvidgsm-dasp/DASP-website/code/ dasp_assimilation
-```
-
 
 ### Configuring the AIDA API
 
