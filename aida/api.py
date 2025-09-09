@@ -95,7 +95,7 @@ def default_api_config() -> Path:
         if os is not Windows of POSIX an error is raised
     """
     if os.name == 'nt':
-        return Path.home().joinpath(r"\AppData\Local\aida\\").joinpath(r"api_config.ini")
+        return Path.home().joinpath(r"AppData\Local\aida\\").joinpath(r"api_config.ini")
     elif os.name == 'posix':
         return Path.home().joinpath('.config').joinpath('aida').joinpath(r"api_config.ini")
     else:

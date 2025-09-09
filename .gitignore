@@ -20,6 +20,7 @@ profile_output*
 env/
 dist/
 docs/_*
+.venv
 
 
 

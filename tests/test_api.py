@@ -8,12 +8,10 @@ import os
 
 class Test_api(unittest.TestCase):
     def test_api(self):
-
-        print(Path(os.environ['USERPROFILE']).joinpath(r"\AppData\Local\aida\\").joinpath(r"api_config.ini"))
-
+        
         Model = aida.AIDAState()
 
-        Model.fromAPI(np.datetime64("2025-04-11T12:00:01"), 'AIDA', 'ultra', APIconfig=Path(os.environ['USERPROFILE']).joinpath(r"\AppData\Local\aida\\").joinpath(r"api_config.ini"))
+        Model.fromAPI(np.datetime64("2025-04-11T12:00:01"), 'AIDA', 'ultra')
 
         np.testing.assert_allclose(Model.calc(45, 55)['NmF2'], 1.30034652e+12)
 
