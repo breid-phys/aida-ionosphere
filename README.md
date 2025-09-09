@@ -88,7 +88,19 @@ _Currently the AIDA interpreter must be installed using git. In the future the m
 
 ### Configuring the AIDA API
 
-AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. By default, `aida` will look for a file called `api_config.ini` in the user's home directory. This file must be edited to include two pieces of information.
+AIDA requires files from the AIDA data assimilation model to produce model output. These files can be automatically downloaded using an API, which requires some configuration. By default, `aida` will look for a file called `api_config.ini` in an OS-dependent location. This file must be edited to include two pieces of information.
+
+#### Linux/Mac ####
+```sh
+    ~/.config/aida/api_config.ini
+```
+
+#### Windows ####
+```sh
+    %USERPROFILE%\AppData\Local\aida\api_config.ini
+```
+
+This file can be created using the function `aida.api.configure_api()`.
 
 **API Token:**
 To be able to automatically download output, the `api_config.ini` file will need to be edited to include your unique API token, which can be found on the [SERENE Website](https://spaceweather.bham.ac.uk/accounts/api-token). This will require [creating an account](https://spaceweather.bham.ac.uk/accounts/register/). 

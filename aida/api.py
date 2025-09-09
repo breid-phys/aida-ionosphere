@@ -14,6 +14,7 @@ import requests
 import os
 import io
 import h5py
+import shutil
 
 from aida.logger import AIDAlogger
 from aida.time import npdt2dt, epoch2npdt
@@ -23,10 +24,83 @@ logger = AIDAlogger(__name__)
 
 ###############################################################################
 
+def configure_api() -> Path:
+    """
+    configure_api this function copies the example api_config.ini file to the default
+    location. This default location is OS-dependent.
 
-def find_api_config():
+    See also
+    -------
+    default_api_config()
+
+    Returns
+    -------
+    Path
+        path to default location of api_config.ini file
+    """
+    example_path = find_api_config()
+    default_path = default_api_config()
+
+    if default_path.exists():
+        print(' default api_config.ini file already exists at '
+                       f"{default_path.expanduser()}")
+        return
+    
+    os.makedirs(default_path.parent, exist_ok=False)
+
+    print(f" copying {example_path.expanduser()} to {default_path.expanduser()}.")
+    shutil.copy(example_path, default_path)
+
+    return default_path
+
+
+###############################################################################
+
+def find_api_config() -> Path:
+    """
+    find_api_config returns a path to example api_config.ini file.
+    This file should be copied to a suitable location and edited to
+    allow automatic acces to the AIDA API.
+
+    Returns
+    -------
+    Path
+        path to example api_config.ini file
+    """
+    
     return resources.files("aida").joinpath("api_config.ini")
 
+
+###############################################################################
+
+def default_api_config() -> Path:
+    """
+    default_api_config returns a path to the default location of the api_config.ini file.
+    This file is located in the following locations (depending on OS)
+
+    ## Linux/Mac ##
+    ~/.config/aida/api_config.ini
+
+    ## Windows ##
+    %USERPROFILE%\AppData\Local\aida\api_config.ini
+
+    Returns
+    -------
+    Path
+        path to default location of api_config.ini file
+
+    Raises
+    ------
+    NotImplementedError
+        if os is not Windows of POSIX an error is raised
+    """
+    if os.name == 'nt':
+        return Path.home().joinpath(r"\AppData\Local\aida\\").joinpath(r"api_config.ini")
+    elif os.name == 'posix':
+        return Path.home().joinpath('.config').joinpath('aida').joinpath(r"api_config.ini")
+    else:
+        raise NotImplementedError("unrecognized operating system")
+    
 
 ###############################################################################
 
@@ -55,7 +129,7 @@ def api_config(filename: str | Path = None):
 
     # default config file
     if filename is None:
-        filename = Path.home().joinpath("api_config.ini")
+        filename = default_api_config()
 
     if not isinstance(filename, Path):
         filename = Path(filename)

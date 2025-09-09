@@ -10,6 +10,7 @@ Created on Thu Jul  6 16:55:29 2023
 import aida
 import numpy as np
 import unittest
+from importlib import resources
 
 
 class Test_model_bounds(unittest.TestCase):
@@ -69,13 +70,13 @@ class Test_model_bounds(unittest.TestCase):
     def test_chars_bounded_NeQuick(self):
         ModelState = aida.AIDAState()
 
-        ModelState.readFile("./tests/data/output_1_221201_053500.h5")
+        ModelState.readFile(resources.files("tests").joinpath("data").joinpath("output_1_221201_053500.h5"))
 
         self._boundsTester(ModelState)
 
     def test_chars_bounded_AIDA(self):
         ModelState = aida.AIDAState()
 
-        ModelState.readFile("./tests/data/output_3_231201_042500.h5")
+        ModelState.readFile(resources.files("tests").joinpath("data").joinpath("output_3_231201_042500.h5"))
 
         self._boundsTester(ModelState)
