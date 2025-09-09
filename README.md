@@ -65,7 +65,15 @@ To access AIDA model output and forecast products, it is necessary to create a f
 <!-- GETTING STARTED -->
 ## Getting Started
 
-### Installation (Local Computer)
+### Installation (pip + git)
+
+_Currently the AIDA interpreter must be installed using git. In the future the model interpreter will be made available on PyPI._
+
+```sh
+python -m pip install git+https://github.com/breid-phys/aida-ionosphere.git
+```
+
+### Installation (git clone)
 
 _Currently the AIDA interpreter must be installed using git. In the future the model interpreter will be made available on PyPI._
 
