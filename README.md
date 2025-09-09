@@ -299,7 +299,39 @@ for i, d in enumerate(["NmF2", "hmF2", "TEC", "MUF3000", "foF2"]):
 
  <img src="tests/data/output_Map.png" alt="Example Output Map" height="380">
 
-### Example 4: Electron Density (Advanced Usage)
+### Example 4: Time Series
+
+It is possible to calculate timeseries outputs from AIDA using tools like `pandas` and `xarray`. The following example calculates NmF2 at three locations for a 15 minute period. Note that AIDA operates using a 5-minute internal timestep, so it is not possible to resolve timescales finer than this. AIDA will not re-download cached outputs.
+
+```py
+import pandas
+import datetime
+import xarray
+
+glat = np.array([45.0,40.0,35.0])
+glon = np.array([0,0,0])
+
+times = pandas.date_range(start=np.datetime64('2024-10-01'), end=np.datetime64('2024-10-01T00:15'), freq=datetime.timedelta(minutes=0.5))
+
+Output = []
+
+for time in times:
+    Model.fromAPI(time=time, model='AIDA', latency='rapid')
+    Result = Model.calc(lat=glat, lon=glon, collapse_particles=True)
+    
+    Output.append(Result.expand_dims(time=[time]))
+
+Output = xarray.concat(Output, dim='time')
+
+plt.plot(Output['time'], Output['NmF2'], label=Output['glat'].data)
+plt.ylabel(f"NmF2 ({Output['NmF2'].attrs['units']})")
+plt.title('NmF2 at three latitudes, longitude=$0^o$')
+plt.legend()
+```
+
+<img src="tests/data/output_timeseries.png" alt="Example Output TimeSeries" height="380">
+
+### Example 5: Electron Density (Advanced Usage)
 
 For some performance-critical applications, it is desireable to calculate only the electron density without additional overhead. This can be achieved with the `AIDAState.calcNe()` method. Like `AIDAState.calc()`, it accepts `glat`, `glon`, `alt`, and `grid`, but outputs only the electron density `Ne` as a `numpy` array. `AIDAState.calcNe()` is often 2 to 5 times faster than calling `AIDAState.calc()` for grid points with 1e3 to 1e4 unique lat/lon pairs.
 
