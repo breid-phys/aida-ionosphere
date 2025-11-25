@@ -425,6 +425,10 @@ def downloadOutput(APIconfig: Path | dict,
         forecast = forecast / np.timedelta64(1, 'm')
 
     if model.upper() == 'AIDA':
+
+        default_url = r"https://spaceweather.bham.ac.uk/api/download-output/"
+        forecast_url = r"https://spaceweather.bham.ac.uk/api/download-forecast/"
+
         if latency == "ultra":
             model_api = 'ultra'
         elif latency == "rapid":
@@ -434,17 +438,24 @@ def downloadOutput(APIconfig: Path | dict,
         else:
             raise ValueError(f" unrecognized latency {latency}")
     elif model.upper() == 'TOMIRIS':
-        raise NotImplementedError('TOMIRIS API support not yet implemented')
-        """
+        
+        default_url = r"https://spaceweather.bham.ac.uk/api/download-tomiris-output/"
+
+        # this URL is assumed to be the one we will use, but not aactive yet
+        forecast_url = r"https://spaceweather.bham.ac.uk/api/download-tomiris-forecast/"
+
+        if forecast != 0:
+            raise NotImplementedError("TOMIRIS does not have API support for forecasts")
+        
         if latency == "ultra":
             model_api = 'ultra'
         elif latency == "rapid":
             model_api = 'rapid'
         elif latency == "daily" or latency == "final":
-            model_api = "final"
+            raise NotImplementedError(r" TOMIRIS does not have a final version")
         else:
             raise ValueError(f" unrecognized latency {latency}")
-        """
+        
     else:
         raise ValueError(f" unrecognized model {model}")
 
@@ -452,7 +463,7 @@ def downloadOutput(APIconfig: Path | dict,
         if forecast != 0:
             raise ValueError(" 'latest' not available for forecast outputs")
 
-        url = "https://spaceweather.bham.ac.uk/api/download-output/"
+        url = default_url
 
         payload = {"latest": True, "product": model_api, "file_type": "raw"}
 
@@ -463,7 +474,7 @@ def downloadOutput(APIconfig: Path | dict,
                                        forecast)
 
         if forecast == 0:
-            url = "https://spaceweather.bham.ac.uk/api/download-output/"
+            url = default_url
 
             payload = {
                 "file_time": time.astype('str'),
@@ -472,7 +483,7 @@ def downloadOutput(APIconfig: Path | dict,
             }
 
         else:
-            url = "https://spaceweather.bham.ac.uk/api/download-forecast/"
+            url = forecast_url
 
             payload = {
                 "file_time": time.astype('str'),
